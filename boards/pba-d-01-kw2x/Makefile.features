@@ -1,1 +1,1 @@
-FEATURES_PROVIDED = periph_gpio periph_uart periph_spi periph_i2c periph_pwm periph_adc periph_rtc periph_random periph_cpuid
+FEATURES_PROVIDED = periph_gpio periph_uart periph_spi periph_i2c periph_pwm periph_adc periph_rtc periph_random periph_cpuid transceiver
