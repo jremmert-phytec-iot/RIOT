@@ -33,8 +33,20 @@ extern "C"
  * @name Clock system configuration
  * @{
  */
-#define CLOCK_CORECLOCK     (48e6)        /* core clock frequency */
+#define KINETIS_CPU_USE_MCG               1
 
+#define KINETIS_MCG_USE_ERC               1
+#define KINETIS_MCG_USE_PLL               1
+#define KINETIS_MCG_DCO_RANGE             (24000000U)
+#define KINETIS_MCG_ERC_OSCILLATOR        0
+#define KINETIS_MCG_ERC_FRDIV             2
+#define KINETIS_MCG_ERC_RANGE             1
+#define KINETIS_MCG_ERC_FREQ              4000000
+#define KINETIS_MCG_PLL_PRDIV             1
+#define KINETIS_MCG_PLL_VDIV0             0
+#define KINETIS_MCG_PLL_FREQ              48000000
+
+#define CLOCK_CORECLOCK                   KINETIS_MCG_PLL_FREQ
 /** @} */
 
 
@@ -79,6 +91,7 @@ extern "C"
 #define UART_CLK            (48e6)
 
 /* UART 0 device configuration */
+#define KINETIS_UART        UART_Type
 #define UART_0_DEV          UART2
 #define UART_0_CLKEN()      (SIM->SCGC4 |= (SIM_SCGC4_UART2_MASK))
 #define UART_0_CLK          UART_CLK
@@ -189,7 +202,6 @@ extern "C"
 #define PWM_0_FTMCHAN_CH3   1
 #define PWM_0_PORT_CH3      PORTA
 #define PWM_0_PIN_AF_CH3    3
-//#define PWM_0_PIN_AF      4
 /** @} */
 
 
@@ -198,7 +210,6 @@ extern "C"
  * @{
  */
 #define SPI_NUMOF           (1U)
-#define SPI_CLK             (48e6)
 #define SPI_0_EN            1
 #define SPI_IRQ_PRIO        1
 
@@ -208,15 +219,19 @@ extern "C"
 #define SPI_0_CLKDIS()          (SIM->SCGC6 &= ~(SIM_SCGC6_SPI0_MASK))
 #define SPI_0_IRQ               SPI0_IRQn
 #define SPI_0_IRQ_HANDLER       isr_spi0
+#define SPI_0_FREQ              (48e6)
+
 /* SPI 0 pin configuration */
 #define SPI_0_PORT              PORTC
 #define SPI_0_PORT_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTC_MASK))
-#define SPI_0_PIN_AF            2
+#define SPI_0_AF                2
+
 #define SPI_0_PCS0_PIN          4
 #define SPI_0_SCK_PIN           5
 #define SPI_0_SOUT_PIN          6
 #define SPI_0_SIN_PIN           7
 
+#define SPI_0_PCS0_ACTIVE_LOW   1
 /** @} */
 
 
@@ -250,30 +265,31 @@ extern "C"
  * @name GPIO configuration
  * @{
  */
-#define GPIO_NUMOF          23
-#define GPIO_0_EN           1	 /* SPI0_CS0 */
-#define GPIO_1_EN           1	 /* SPI0_CLK */
-#define GPIO_2_EN           1	 /* SPI0_MOSI */
-#define GPIO_3_EN           1	 /* SPI0_MISO */
+#define GPIO_NUMOF          24
+#define GPIO_0_EN           0	 /* SPI0_CS0 */
+#define GPIO_1_EN           0	 /* SPI0_CLK */
+#define GPIO_2_EN           0	 /* SPI0_MOSI */
+#define GPIO_3_EN           0	 /* SPI0_MISO */
 #define GPIO_4_EN           0	 /* UART2_RX */
 #define GPIO_5_EN           0	 /* UART2_TX */
-#define GPIO_6_EN           1
-#define GPIO_7_EN           1
+#define GPIO_6_EN           0
+#define GPIO_7_EN           0
 #define GPIO_8_EN           0	 /* I2CSDA */
 #define GPIO_9_EN           0	 /* I2CSCL */
-#define GPIO_10_EN          1
-#define GPIO_11_EN          1
-#define GPIO_12_EN          1
+#define GPIO_10_EN          0
+#define GPIO_11_EN          0
+#define GPIO_12_EN          0
 #define GPIO_13_EN          0	 /* USB VOUT 3V3 */
 #define GPIO_14_EN          0	 /* USB VREGIN */
-#define GPIO_15_EN          1
-#define GPIO_16_EN          1
-#define GPIO_17_EN          1
-#define GPIO_18_EN          1
-#define GPIO_19_EN          1
-#define GPIO_20_EN          1
-#define GPIO_21_EN          1
+#define GPIO_15_EN          0
+#define GPIO_16_EN          0
+#define GPIO_17_EN          0
+#define GPIO_18_EN          0
+#define GPIO_19_EN          0
+#define GPIO_20_EN          0
+#define GPIO_21_EN          0
 #define GPIO_22_EN          1	 /* User Button, use as input */
+#define GPIO_23_EN          1    /* KW2XRF INT */
 #define GPIO_IRQ_PRIO       1
 
 /* GPIO channel 0 config */
@@ -437,25 +453,33 @@ extern "C"
 #define GPIO_22_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTD_MASK))
 #define GPIO_22_IRQ          PORTD_IRQn
 #define GPIO_22_ISR          isr_portd
+/* GPIO channel 23 config */
+#define GPIO_23_DEV          KW2XDRF_GPIO
+#define GPIO_23_PORT         KW2XDRF_PORT
+#define GPIO_23_PIN          KW2XDRF_IRQ_PIN
+#define GPIO_23_CLKEN()      KW2XDRF_PORT_CLKEN()
+#define GPIO_23_IRQ          KW2XDRF_PORT_IRQn
+#define GPIO_23_ISR          isr_portb
+#define GPIO_KW2XDRF         GPIO_23
 /** @} */
 
 /**
 * @name RTC configuration
 * @{
 */
-#define RTC_NUMOF           (1U)
-#define RTC_DEV             RTC
-#define RTC_UNLOCK()        (SIM->SCGC6 |= (SIM_SCGC6_RTC_MASK))
+#define RTC_NUMOF            (1U)
+#define RTC_DEV              RTC
+#define RTC_UNLOCK()         (SIM->SCGC6 |= (SIM_SCGC6_RTC_MASK))
 /** @} */
 
 /**
  * @name Random Number Generator configuration
  * @{
  */
-#define RANDOM_NUMOF            (1U)
-#define RANDOM_CLKEN()          (SIM->SCGC6 |= (1 << 9))
-#define RANDOM_CLKDIS()         (SIM->SCGC6 &= ~(1 << 9))
-#define RANDOM_RNGA_BASE        (0x40029000u)
+#define RANDOM_NUMOF         (1U)
+#define KINETIS_RNGA         RNG
+#define RANDOM_CLKEN()       (SIM->SCGC6 |= (1 << 9))
+#define RANDOM_CLKDIS()      (SIM->SCGC6 &= ~(1 << 9))
 
 /** @} */
 
