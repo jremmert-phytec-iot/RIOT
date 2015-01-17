@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 Freie Universität Berlin
  * Copyright (C) 2014 PHYTEC Messtechnik GmbH
+ * Copyright (C) 2014 Eistec AB
  *
  * This file is subject to the terms and conditions of the GNU Lesser General
  * Public License v2.1. See the file LICENSE in the top level directory for more
@@ -8,7 +9,8 @@
  */
 
 /**
- * @ingroup     cpu_kinetis_common
+ * @ingroup     cpu_kinetis_common_gpio
+ *
  * @{
  *
  * @file
@@ -17,6 +19,7 @@
  * @author      Hauke Petersen <mail@haukepetersen.de>
  * @author      Johann Fischer <j.fischer@phytec.de>
  * @author      Jonas Remmert <j.remmert@phytec.de>
+ * @author      Joakim Gebart <joakim.gebart@eistec.se
  *
  * @}
  */
@@ -29,9 +32,30 @@
 
 #if GPIO_NUMOF
 
+#ifndef PIN_MUX_FUNCTION_ANALOG
+#define PIN_MUX_FUNCTION_ANALOG     0
+#endif
+
+#ifndef PIN_MUX_FUNCTION_GPIO
+#define PIN_MUX_FUNCTION_GPIO       1
+#endif
+
+#ifndef PIN_INTERRUPT_RISING
+#define PIN_INTERRUPT_RISING        0x9
+#endif
+
+#ifndef PIN_INTERRUPT_FALLING
+#define PIN_INTERRUPT_FALLING       0xa
+#endif
+
+#ifndef PIN_INTERRUPT_EDGE
+#define PIN_INTERRUPT_EDGE          0xb
+#endif
+
 typedef struct {
     gpio_cb_t cb;       /**< callback called from GPIO interrupt */
     void *arg;          /**< argument passed to the callback */
+    uint32_t irqc;      /**< remember interrupt configuration between disable/enable */
 } gpio_state_t;
 
 /**
@@ -346,24 +370,33 @@ int gpio_init_out(gpio_t dev, gpio_pp_t pushpull)
             return -1;
     }
 
-    port->PCR[pin] = PORT_PCR_MUX(1);
+    /* Clear interrupt config */
+    config[dev].cb = NULL;
+    config[dev].arg = NULL;
+    config[dev].irqc = 0;
+
+    /* Reset all pin control settings for the pin */
+    /* Switch to analog input function while fiddling with the settings, to be safe. */
+    port->PCR[pin] = PORT_PCR_MUX(PIN_MUX_FUNCTION_ANALOG);
 
     /* set to push-pull configuration */
     switch (pushpull) {
         case GPIO_PULLUP:
-            port->PCR[pin] |= (1 << PORT_PCR_PE_SHIFT | 1 << PORT_PCR_PS_SHIFT);
+            port->PCR[pin] |= PORT_PCR_PE_MASK | PORT_PCR_PS_MASK; /* Pull enable, pull up */
             break;
 
         case GPIO_PULLDOWN:
-            port->PCR[pin] |= (1 << PORT_PCR_PE_SHIFT);
+            port->PCR[pin] |= PORT_PCR_PE_MASK; /* Pull enable, !pull up */
             break;
 
         default:
             break;
     }
 
-    gpio->PDDR |= (1 << pin);
-    gpio->PCOR |= (1 << pin);
+    gpio->PDDR |= GPIO_PDDR_PDD(1 << pin);     /* set pin to output mode */
+    gpio->PCOR |= GPIO_PCOR_PTCO(1 << pin);    /* set output to low */
+    /* Select GPIO function for the pin */
+    port->PCR[pin] |= PORT_PCR_MUX(PIN_MUX_FUNCTION_GPIO);
 
     return 0;
 }
@@ -668,23 +701,30 @@ int gpio_init_in(gpio_t dev, gpio_pp_t pushpull)
             return -1;
     }
 
-    port->PCR[pin] = PORT_PCR_MUX(1);
+    /* Reset all pin control settings for the pin */
+    /* Switch to analog input function while fiddling with the settings, to be safe. */
+    port->PCR[pin] = PORT_PCR_MUX(PIN_MUX_FUNCTION_ANALOG);
 
     /* set to push-pull configuration */
     switch (pushpull) {
+        case GPIO_NOPULL:
+            break;
+
         case GPIO_PULLUP:
-            port->PCR[pin] |= (1 << PORT_PCR_PE_SHIFT | 1 << PORT_PCR_PS_SHIFT);
+            port->PCR[pin] |= PORT_PCR_PE_MASK | PORT_PCR_PS_MASK; /* Pull enable, pull up */
             break;
 
         case GPIO_PULLDOWN:
-            port->PCR[pin] |= (1 << PORT_PCR_PE_SHIFT);
+            port->PCR[pin] |= PORT_PCR_PE_MASK; /* Pull enable */
             break;
 
         default:
             break;
     }
 
-    gpio->PDDR &= ~(1 << pin);
+    gpio->PDDR &= ~(GPIO_PDDR_PDD(1 << pin));     /* set pin to input mode */
+    /* Select GPIO function for the pin */
+    port->PCR[pin] |= PORT_PCR_MUX(PIN_MUX_FUNCTION_GPIO);
 
     return 0;
 }
@@ -1002,19 +1042,512 @@ int gpio_init_int(gpio_t dev, gpio_pp_t pushpull, gpio_flank_t flank, gpio_cb_t 
     /* configure the active edges */
     switch (flank) {
         case GPIO_RISING:
-            port->PCR[pin] |= PORT_PCR_IRQC(9);
+            port->PCR[pin] &= ~(PORT_PCR_IRQC_MASK); /* Disable interrupt */
+            port->PCR[pin] |= PORT_PCR_ISF_MASK; /* Clear interrupt flag */
+            port->PCR[pin] |= PORT_PCR_IRQC(PIN_INTERRUPT_RISING); /* Enable interrupt */
+            config[dev].irqc = PORT_PCR_IRQC(PIN_INTERRUPT_RISING);
             break;
 
         case GPIO_FALLING:
-            port->PCR[pin] |= PORT_PCR_IRQC(10);
+            port->PCR[pin] &= ~(PORT_PCR_IRQC_MASK); /* Disable interrupt */
+            port->PCR[pin] |= PORT_PCR_ISF_MASK; /* Clear interrupt flag */
+            port->PCR[pin] |= PORT_PCR_IRQC(PIN_INTERRUPT_FALLING); /* Enable interrupt */
+            config[dev].irqc = PORT_PCR_IRQC(PIN_INTERRUPT_FALLING);
             break;
 
         case GPIO_BOTH:
-            port->PCR[pin] |= PORT_PCR_IRQC(11);
+            port->PCR[pin] &= ~(PORT_PCR_IRQC_MASK); /* Disable interrupt */
+            port->PCR[pin] |= PORT_PCR_ISF_MASK; /* Clear interrupt flag */
+            port->PCR[pin] |= PORT_PCR_IRQC(PIN_INTERRUPT_EDGE); /* Enable interrupt */
+            config[dev].irqc = PORT_PCR_IRQC(PIN_INTERRUPT_EDGE);
             break;
+
+        default:
+            /* Unknown setting */
+            return -1;
     }
 
     return 0;
+}
+
+void gpio_irq_enable(gpio_t dev)
+{
+    PORT_Type *port;
+    uint32_t pin = 0;
+
+    switch (dev) {
+#if GPIO_0_EN
+
+        case GPIO_0:
+            port = GPIO_0_PORT;
+            pin = GPIO_0_PIN;
+            break;
+#endif
+#if GPIO_1_EN
+
+        case GPIO_1:
+            port = GPIO_1_PORT;
+            pin = GPIO_1_PIN;
+            break;
+#endif
+#if GPIO_2_EN
+
+        case GPIO_2:
+            port = GPIO_2_PORT;
+            pin = GPIO_2_PIN;
+            break;
+#endif
+#if GPIO_3_EN
+
+        case GPIO_3:
+            port = GPIO_3_PORT;
+            pin = GPIO_3_PIN;
+            break;
+#endif
+#if GPIO_4_EN
+
+        case GPIO_4:
+            port = GPIO_4_PORT;
+            pin = GPIO_4_PIN;
+            break;
+#endif
+#if GPIO_5_EN
+
+        case GPIO_5:
+            port = GPIO_5_PORT;
+            pin = GPIO_5_PIN;
+            break;
+#endif
+#if GPIO_6_EN
+
+        case GPIO_6:
+            port = GPIO_6_PORT;
+            pin = GPIO_6_PIN;
+            break;
+#endif
+#if GPIO_7_EN
+
+        case GPIO_7:
+            port = GPIO_7_PORT;
+            pin = GPIO_7_PIN;
+            break;
+#endif
+#if GPIO_8_EN
+
+        case GPIO_8:
+            port = GPIO_8_PORT;
+            pin = GPIO_8_PIN;
+            break;
+#endif
+#if GPIO_9_EN
+
+        case GPIO_9:
+            port = GPIO_9_PORT;
+            pin = GPIO_9_PIN;
+            break;
+#endif
+#if GPIO_10_EN
+
+        case GPIO_10:
+            port = GPIO_10_PORT;
+            pin = GPIO_10_PIN;
+            break;
+#endif
+#if GPIO_11_EN
+
+        case GPIO_11:
+            port = GPIO_11_PORT;
+            pin = GPIO_11_PIN;
+            break;
+#endif
+#if GPIO_12_EN
+
+        case GPIO_12:
+            port = GPIO_12_PORT;
+            pin = GPIO_12_PIN;
+            break;
+#endif
+#if GPIO_13_EN
+
+        case GPIO_13:
+            port = GPIO_13_PORT;
+            pin = GPIO_13_PIN;
+            break;
+#endif
+#if GPIO_14_EN
+
+        case GPIO_14:
+            port = GPIO_14_PORT;
+            pin = GPIO_14_PIN;
+            break;
+#endif
+#if GPIO_15_EN
+
+        case GPIO_15:
+            port = GPIO_15_PORT;
+            pin = GPIO_15_PIN;
+            break;
+#endif
+#if GPIO_16_EN
+
+        case GPIO_16:
+            port = GPIO_16_PORT;
+            pin = GPIO_16_PIN;
+            break;
+#endif
+#if GPIO_17_EN
+
+        case GPIO_17:
+            port = GPIO_17_PORT;
+            pin = GPIO_17_PIN;
+            break;
+#endif
+#if GPIO_18_EN
+
+        case GPIO_18:
+            port = GPIO_18_PORT;
+            pin = GPIO_18_PIN;
+            break;
+#endif
+#if GPIO_19_EN
+
+        case GPIO_19:
+            port = GPIO_19_PORT;
+            pin = GPIO_19_PIN;
+            break;
+#endif
+#if GPIO_20_EN
+
+        case GPIO_20:
+            port = GPIO_20_PORT;
+            pin = GPIO_20_PIN;
+            break;
+#endif
+#if GPIO_21_EN
+
+        case GPIO_21:
+            port = GPIO_21_PORT;
+            pin = GPIO_21_PIN;
+            break;
+#endif
+#if GPIO_22_EN
+
+        case GPIO_22:
+            port = GPIO_22_PORT;
+            pin = GPIO_22_PIN;
+            break;
+#endif
+#if GPIO_23_EN
+
+        case GPIO_23:
+            port = GPIO_23_PORT;
+            pin = GPIO_23_PIN;
+            break;
+#endif
+#if GPIO_24_EN
+
+        case GPIO_24:
+            port = GPIO_24_PORT;
+            pin = GPIO_24_PIN;
+            break;
+#endif
+#if GPIO_25_EN
+
+        case GPIO_25:
+            port = GPIO_25_PORT;
+            pin = GPIO_25_PIN;
+            break;
+#endif
+#if GPIO_26_EN
+
+        case GPIO_26:
+            port = GPIO_26_PORT;
+            pin = GPIO_26_PIN;
+            break;
+#endif
+#if GPIO_27_EN
+
+        case GPIO_27:
+            port = GPIO_27_PORT;
+            pin = GPIO_27_PIN;
+            break;
+#endif
+#if GPIO_28_EN
+
+        case GPIO_28:
+            port = GPIO_28_PORT;
+            pin = GPIO_28_PIN;
+            break;
+#endif
+#if GPIO_29_EN
+
+        case GPIO_29:
+            port = GPIO_29_PORT;
+            pin = GPIO_29_PIN;
+            break;
+#endif
+#if GPIO_30_EN
+
+        case GPIO_30:
+            port = GPIO_30_PORT;
+            pin = GPIO_30_PIN;
+            break;
+#endif
+#if GPIO_31_EN
+
+        case GPIO_31:
+            port = GPIO_31_PORT;
+            pin = GPIO_31_PIN;
+            break;
+#endif
+
+        default:
+            return;
+    }
+
+    /* Restore saved state */
+    port->PCR[pin] &= ~(PORT_PCR_IRQC_MASK);
+    port->PCR[pin] |= PORT_PCR_IRQC_MASK & config[dev].irqc;
+}
+
+void gpio_irq_disable(gpio_t dev)
+{
+    PORT_Type *port;
+    uint32_t pin = 0;
+
+    switch (dev) {
+#if GPIO_0_EN
+
+        case GPIO_0:
+            port = GPIO_0_PORT;
+            pin = GPIO_0_PIN;
+            break;
+#endif
+#if GPIO_1_EN
+
+        case GPIO_1:
+            port = GPIO_1_PORT;
+            pin = GPIO_1_PIN;
+            break;
+#endif
+#if GPIO_2_EN
+
+        case GPIO_2:
+            port = GPIO_2_PORT;
+            pin = GPIO_2_PIN;
+            break;
+#endif
+#if GPIO_3_EN
+
+        case GPIO_3:
+            port = GPIO_3_PORT;
+            pin = GPIO_3_PIN;
+            break;
+#endif
+#if GPIO_4_EN
+
+        case GPIO_4:
+            port = GPIO_4_PORT;
+            pin = GPIO_4_PIN;
+            break;
+#endif
+#if GPIO_5_EN
+
+        case GPIO_5:
+            port = GPIO_5_PORT;
+            pin = GPIO_5_PIN;
+            break;
+#endif
+#if GPIO_6_EN
+
+        case GPIO_6:
+            port = GPIO_6_PORT;
+            pin = GPIO_6_PIN;
+            break;
+#endif
+#if GPIO_7_EN
+
+        case GPIO_7:
+            port = GPIO_7_PORT;
+            pin = GPIO_7_PIN;
+            break;
+#endif
+#if GPIO_8_EN
+
+        case GPIO_8:
+            port = GPIO_8_PORT;
+            pin = GPIO_8_PIN;
+            break;
+#endif
+#if GPIO_9_EN
+
+        case GPIO_9:
+            port = GPIO_9_PORT;
+            pin = GPIO_9_PIN;
+            break;
+#endif
+#if GPIO_10_EN
+
+        case GPIO_10:
+            port = GPIO_10_PORT;
+            pin = GPIO_10_PIN;
+            break;
+#endif
+#if GPIO_11_EN
+
+        case GPIO_11:
+            port = GPIO_11_PORT;
+            pin = GPIO_11_PIN;
+            break;
+#endif
+#if GPIO_12_EN
+
+        case GPIO_12:
+            port = GPIO_12_PORT;
+            pin = GPIO_12_PIN;
+            break;
+#endif
+#if GPIO_13_EN
+
+        case GPIO_13:
+            port = GPIO_13_PORT;
+            pin = GPIO_13_PIN;
+            break;
+#endif
+#if GPIO_14_EN
+
+        case GPIO_14:
+            port = GPIO_14_PORT;
+            pin = GPIO_14_PIN;
+            break;
+#endif
+#if GPIO_15_EN
+
+        case GPIO_15:
+            port = GPIO_15_PORT;
+            pin = GPIO_15_PIN;
+            break;
+#endif
+#if GPIO_16_EN
+
+        case GPIO_16:
+            port = GPIO_16_PORT;
+            pin = GPIO_16_PIN;
+            break;
+#endif
+#if GPIO_17_EN
+
+        case GPIO_17:
+            port = GPIO_17_PORT;
+            pin = GPIO_17_PIN;
+            break;
+#endif
+#if GPIO_18_EN
+
+        case GPIO_18:
+            port = GPIO_18_PORT;
+            pin = GPIO_18_PIN;
+            break;
+#endif
+#if GPIO_19_EN
+
+        case GPIO_19:
+            port = GPIO_19_PORT;
+            pin = GPIO_19_PIN;
+            break;
+#endif
+#if GPIO_20_EN
+
+        case GPIO_20:
+            port = GPIO_20_PORT;
+            pin = GPIO_20_PIN;
+            break;
+#endif
+#if GPIO_21_EN
+
+        case GPIO_21:
+            port = GPIO_21_PORT;
+            pin = GPIO_21_PIN;
+            break;
+#endif
+#if GPIO_22_EN
+
+        case GPIO_22:
+            port = GPIO_22_PORT;
+            pin = GPIO_22_PIN;
+            break;
+#endif
+#if GPIO_23_EN
+
+        case GPIO_23:
+            port = GPIO_23_PORT;
+            pin = GPIO_23_PIN;
+            break;
+#endif
+#if GPIO_24_EN
+
+        case GPIO_24:
+            port = GPIO_24_PORT;
+            pin = GPIO_24_PIN;
+            break;
+#endif
+#if GPIO_25_EN
+
+        case GPIO_25:
+            port = GPIO_25_PORT;
+            pin = GPIO_25_PIN;
+            break;
+#endif
+#if GPIO_26_EN
+
+        case GPIO_26:
+            port = GPIO_26_PORT;
+            pin = GPIO_26_PIN;
+            break;
+#endif
+#if GPIO_27_EN
+
+        case GPIO_27:
+            port = GPIO_27_PORT;
+            pin = GPIO_27_PIN;
+            break;
+#endif
+#if GPIO_28_EN
+
+        case GPIO_28:
+            port = GPIO_28_PORT;
+            pin = GPIO_28_PIN;
+            break;
+#endif
+#if GPIO_29_EN
+
+        case GPIO_29:
+            port = GPIO_29_PORT;
+            pin = GPIO_29_PIN;
+            break;
+#endif
+#if GPIO_30_EN
+
+        case GPIO_30:
+            port = GPIO_30_PORT;
+            pin = GPIO_30_PIN;
+            break;
+#endif
+#if GPIO_31_EN
+
+        case GPIO_31:
+            port = GPIO_31_PORT;
+            pin = GPIO_31_PIN;
+            break;
+#endif
+
+        default:
+            return;
+    }
+
+    /* Save irqc state before disabling to allow enabling with the same trigger settings later. */
+    config[dev].irqc = PORT_PCR_IRQC_MASK & port->PCR[pin];
+    port->PCR[pin] &= ~(PORT_PCR_IRQC_MASK);
 }
 
 int gpio_read(gpio_t dev)
@@ -1252,11 +1785,11 @@ int gpio_read(gpio_t dev)
             return -1;
     }
 
-    if (gpio->PDDR & (1 << pin)) {
-        return gpio->PDOR & (1 << pin);          /* read output data register */
+    if (gpio->PDDR & GPIO_PDDR_PDD(1 << pin)) {      /* if configured as output */
+        return gpio->PDOR & GPIO_PDOR_PDO(1 << pin); /* read output data register */
     }
     else {
-        return gpio->PDIR & (1 << pin);          /* else read input data register */
+        return gpio->PDIR & GPIO_PDIR_PDI(1 << pin); /* else read input data register */
     }
 }
 
@@ -1266,193 +1799,193 @@ void gpio_set(gpio_t dev)
 #if GPIO_0_EN
 
         case GPIO_0:
-            GPIO_0_DEV->PSOR |= (1 << GPIO_0_PIN);
+            GPIO_0_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_0_PIN);
             break;
 #endif
 #if GPIO_1_EN
 
         case GPIO_1:
-            GPIO_1_DEV->PSOR |= (1 << GPIO_1_PIN);
+            GPIO_1_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_1_PIN);
             break;
 #endif
 #if GPIO_2_EN
 
         case GPIO_2:
-            GPIO_2_DEV->PSOR |= (1 << GPIO_2_PIN);
+            GPIO_2_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_2_PIN);
             break;
 #endif
 #if GPIO_3_EN
 
         case GPIO_3:
-            GPIO_3_DEV->PSOR |= (1 << GPIO_3_PIN);
+            GPIO_3_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_3_PIN);
             break;
 #endif
 #if GPIO_4_EN
 
         case GPIO_4:
-            GPIO_4_DEV->PSOR |= (1 << GPIO_4_PIN);
+            GPIO_4_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_4_PIN);
             break;
 #endif
 #if GPIO_5_EN
 
         case GPIO_5:
-            GPIO_5_DEV->PSOR |= (1 << GPIO_5_PIN);
+            GPIO_5_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_5_PIN);
             break;
 #endif
 #if GPIO_6_EN
 
         case GPIO_6:
-            GPIO_6_DEV->PSOR |= (1 << GPIO_6_PIN);
+            GPIO_6_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_6_PIN);
             break;
 #endif
 #if GPIO_7_EN
 
         case GPIO_7:
-            GPIO_7_DEV->PSOR |= (1 << GPIO_7_PIN);
+            GPIO_7_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_7_PIN);
             break;
 #endif
 #if GPIO_8_EN
 
         case GPIO_8:
-            GPIO_8_DEV->PSOR |= (1 << GPIO_8_PIN);
+            GPIO_8_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_8_PIN);
             break;
 #endif
 #if GPIO_9_EN
 
         case GPIO_9:
-            GPIO_9_DEV->PSOR |= (1 << GPIO_9_PIN);
+            GPIO_9_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_9_PIN);
             break;
 #endif
 #if GPIO_10_EN
 
         case GPIO_10:
-            GPIO_10_DEV->PSOR |= (1 << GPIO_10_PIN);
+            GPIO_10_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_10_PIN);
             break;
 #endif
 #if GPIO_11_EN
 
         case GPIO_11:
-            GPIO_11_DEV->PSOR |= (1 << GPIO_11_PIN);
+            GPIO_11_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_11_PIN);
             break;
 #endif
 #if GPIO_12_EN
 
         case GPIO_12:
-            GPIO_12_DEV->PSOR |= (1 << GPIO_12_PIN);
+            GPIO_12_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_12_PIN);
             break;
 #endif
 #if GPIO_13_EN
 
         case GPIO_13:
-            GPIO_13_DEV->PSOR |= (1 << GPIO_13_PIN);
+            GPIO_13_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_13_PIN);
             break;
 #endif
 #if GPIO_14_EN
 
         case GPIO_14:
-            GPIO_14_DEV->PSOR |= (1 << GPIO_14_PIN);
+            GPIO_14_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_14_PIN);
             break;
 #endif
 #if GPIO_15_EN
 
         case GPIO_15:
-            GPIO_15_DEV->PSOR |= (1 << GPIO_15_PIN);
+            GPIO_15_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_15_PIN);
             break;
 #endif
 #if GPIO_16_EN
 
         case GPIO_16:
-            GPIO_16_DEV->PSOR |= (1 << GPIO_16_PIN);
+            GPIO_16_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_16_PIN);
             break;
 #endif
 #if GPIO_17_EN
 
         case GPIO_17:
-            GPIO_17_DEV->PSOR |= (1 << GPIO_17_PIN);
+            GPIO_17_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_17_PIN);
             break;
 #endif
 #if GPIO_18_EN
 
         case GPIO_18:
-            GPIO_18_DEV->PSOR |= (1 << GPIO_18_PIN);
+            GPIO_18_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_18_PIN);
             break;
 #endif
 #if GPIO_19_EN
 
         case GPIO_19:
-            GPIO_19_DEV->PSOR |= (1 << GPIO_19_PIN);
+            GPIO_19_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_19_PIN);
             break;
 #endif
 #if GPIO_20_EN
 
         case GPIO_20:
-            GPIO_20_DEV->PSOR |= (1 << GPIO_20_PIN);
+            GPIO_20_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_20_PIN);
             break;
 #endif
 #if GPIO_21_EN
 
         case GPIO_21:
-            GPIO_21_DEV->PSOR |= (1 << GPIO_21_PIN);
+            GPIO_21_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_21_PIN);
             break;
 #endif
 #if GPIO_22_EN
 
         case GPIO_22:
-            GPIO_22_DEV->PSOR |= (1 << GPIO_22_PIN);
+            GPIO_22_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_22_PIN);
             break;
 #endif
 #if GPIO_23_EN
 
         case GPIO_23:
-            GPIO_23_DEV->PSOR |= (1 << GPIO_23_PIN);
+            GPIO_23_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_23_PIN);
             break;
 #endif
 #if GPIO_24_EN
 
         case GPIO_24:
-            GPIO_24_DEV->PSOR |= (1 << GPIO_24_PIN);
+            GPIO_24_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_24_PIN);
             break;
 #endif
 #if GPIO_25_EN
 
         case GPIO_25:
-            GPIO_25_DEV->PSOR |= (1 << GPIO_25_PIN);
+            GPIO_25_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_25_PIN);
             break;
 #endif
 #if GPIO_26_EN
 
         case GPIO_26:
-            GPIO_26_DEV->PSOR |= (1 << GPIO_26_PIN);
+            GPIO_26_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_26_PIN);
             break;
 #endif
 #if GPIO_27_EN
 
         case GPIO_27:
-            GPIO_27_DEV->PSOR |= (1 << GPIO_27_PIN);
+            GPIO_27_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_27_PIN);
             break;
 #endif
 #if GPIO_28_EN
 
         case GPIO_28:
-            GPIO_28_DEV->PSOR |= (1 << GPIO_28_PIN);
+            GPIO_28_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_28_PIN);
             break;
 #endif
 #if GPIO_29_EN
 
         case GPIO_29:
-            GPIO_29_DEV->PSOR |= (1 << GPIO_29_PIN);
+            GPIO_29_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_29_PIN);
             break;
 #endif
 #if GPIO_30_EN
 
         case GPIO_30:
-            GPIO_30_DEV->PSOR |= (1 << GPIO_30_PIN);
+            GPIO_30_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_30_PIN);
             break;
 #endif
 #if GPIO_31_EN
 
         case GPIO_31:
-            GPIO_31_DEV->PSOR |= (1 << GPIO_31_PIN);
+            GPIO_31_DEV->PSOR |= GPIO_PSOR_PTSO(1 << GPIO_31_PIN);
             break;
 #endif
     }
@@ -1464,193 +1997,193 @@ void gpio_clear(gpio_t dev)
 #if GPIO_0_EN
 
         case GPIO_0:
-            GPIO_0_DEV->PCOR |= (1 << GPIO_0_PIN);
+            GPIO_0_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_0_PIN);
             break;
 #endif
 #if GPIO_1_EN
 
         case GPIO_1:
-            GPIO_1_DEV->PCOR |= (1 << GPIO_1_PIN);
+            GPIO_1_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_1_PIN);
             break;
 #endif
 #if GPIO_2_EN
 
         case GPIO_2:
-            GPIO_2_DEV->PCOR |= (1 << GPIO_2_PIN);
+            GPIO_2_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_2_PIN);
             break;
 #endif
 #if GPIO_3_EN
 
         case GPIO_3:
-            GPIO_3_DEV->PCOR |= (1 << GPIO_3_PIN);
+            GPIO_3_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_3_PIN);
             break;
 #endif
 #if GPIO_4_EN
 
         case GPIO_4:
-            GPIO_4_DEV->PCOR |= (1 << GPIO_4_PIN);
+            GPIO_4_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_4_PIN);
             break;
 #endif
 #if GPIO_5_EN
 
         case GPIO_5:
-            GPIO_5_DEV->PCOR |= (1 << GPIO_5_PIN);
+            GPIO_5_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_5_PIN);
             break;
 #endif
 #if GPIO_6_EN
 
         case GPIO_6:
-            GPIO_6_DEV->PCOR |= (1 << GPIO_6_PIN);
+            GPIO_6_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_6_PIN);
             break;
 #endif
 #if GPIO_7_EN
 
         case GPIO_7:
-            GPIO_7_DEV->PCOR |= (1 << GPIO_7_PIN);
+            GPIO_7_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_7_PIN);
             break;
 #endif
 #if GPIO_8_EN
 
         case GPIO_8:
-            GPIO_8_DEV->PCOR |= (1 << GPIO_8_PIN);
+            GPIO_8_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_8_PIN);
             break;
 #endif
 #if GPIO_9_EN
 
         case GPIO_9:
-            GPIO_9_DEV->PCOR |= (1 << GPIO_9_PIN);
+            GPIO_9_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_9_PIN);
             break;
 #endif
 #if GPIO_10_EN
 
         case GPIO_10:
-            GPIO_10_DEV->PCOR |= (1 << GPIO_10_PIN);
+            GPIO_10_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_10_PIN);
             break;
 #endif
 #if GPIO_11_EN
 
         case GPIO_11:
-            GPIO_11_DEV->PCOR |= (1 << GPIO_11_PIN);
+            GPIO_11_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_11_PIN);
             break;
 #endif
 #if GPIO_12_EN
 
         case GPIO_12:
-            GPIO_12_DEV->PCOR |= (1 << GPIO_12_PIN);
+            GPIO_12_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_12_PIN);
             break;
 #endif
 #if GPIO_13_EN
 
         case GPIO_13:
-            GPIO_13_DEV->PCOR |= (1 << GPIO_13_PIN);
+            GPIO_13_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_13_PIN);
             break;
 #endif
 #if GPIO_14_EN
 
         case GPIO_14:
-            GPIO_14_DEV->PCOR |= (1 << GPIO_14_PIN);
+            GPIO_14_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_14_PIN);
             break;
 #endif
 #if GPIO_15_EN
 
         case GPIO_15:
-            GPIO_15_DEV->PCOR |= (1 << GPIO_15_PIN);
+            GPIO_15_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_15_PIN);
             break;
 #endif
 #if GPIO_16_EN
 
         case GPIO_16:
-            GPIO_16_DEV->PCOR |= (1 << GPIO_16_PIN);
+            GPIO_16_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_16_PIN);
             break;
 #endif
 #if GPIO_17_EN
 
         case GPIO_17:
-            GPIO_17_DEV->PCOR |= (1 << GPIO_17_PIN);
+            GPIO_17_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_17_PIN);
             break;
 #endif
 #if GPIO_18_EN
 
         case GPIO_18:
-            GPIO_18_DEV->PCOR |= (1 << GPIO_18_PIN);
+            GPIO_18_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_18_PIN);
             break;
 #endif
 #if GPIO_19_EN
 
         case GPIO_19:
-            GPIO_19_DEV->PCOR |= (1 << GPIO_19_PIN);
+            GPIO_19_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_19_PIN);
             break;
 #endif
 #if GPIO_20_EN
 
         case GPIO_20:
-            GPIO_20_DEV->PCOR |= (1 << GPIO_20_PIN);
+            GPIO_20_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_20_PIN);
             break;
 #endif
 #if GPIO_21_EN
 
         case GPIO_21:
-            GPIO_21_DEV->PCOR |= (1 << GPIO_21_PIN);
+            GPIO_21_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_21_PIN);
             break;
 #endif
 #if GPIO_22_EN
 
         case GPIO_22:
-            GPIO_22_DEV->PCOR |= (1 << GPIO_22_PIN);
+            GPIO_22_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_22_PIN);
             break;
 #endif
 #if GPIO_23_EN
 
         case GPIO_23:
-            GPIO_23_DEV->PCOR |= (1 << GPIO_23_PIN);
+            GPIO_23_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_23_PIN);
             break;
 #endif
 #if GPIO_24_EN
 
         case GPIO_24:
-            GPIO_24_DEV->PCOR |= (1 << GPIO_24_PIN);
+            GPIO_24_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_24_PIN);
             break;
 #endif
 #if GPIO_25_EN
 
         case GPIO_25:
-            GPIO_25_DEV->PCOR |= (1 << GPIO_25_PIN);
+            GPIO_25_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_25_PIN);
             break;
 #endif
 #if GPIO_26_EN
 
         case GPIO_26:
-            GPIO_26_DEV->PCOR |= (1 << GPIO_26_PIN);
+            GPIO_26_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_26_PIN);
             break;
 #endif
 #if GPIO_27_EN
 
         case GPIO_27:
-            GPIO_27_DEV->PCOR |= (1 << GPIO_27_PIN);
+            GPIO_27_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_27_PIN);
             break;
 #endif
 #if GPIO_28_EN
 
         case GPIO_28:
-            GPIO_28_DEV->PCOR |= (1 << GPIO_28_PIN);
+            GPIO_28_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_28_PIN);
             break;
 #endif
 #if GPIO_29_EN
 
         case GPIO_29:
-            GPIO_29_DEV->PCOR |= (1 << GPIO_29_PIN);
+            GPIO_29_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_29_PIN);
             break;
 #endif
 #if GPIO_30_EN
 
         case GPIO_30:
-            GPIO_30_DEV->PCOR |= (1 << GPIO_30_PIN);
+            GPIO_30_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_30_PIN);
             break;
 #endif
 #if GPIO_31_EN
 
         case GPIO_31:
-            GPIO_31_DEV->PCOR |= (1 << GPIO_31_PIN);
+            GPIO_31_DEV->PCOR |= GPIO_PCOR_PTCO(1 << GPIO_31_PIN);
             break;
 #endif
     }
@@ -1662,193 +2195,193 @@ void gpio_toggle(gpio_t dev)
 #if GPIO_0_EN
 
         case GPIO_0:
-            GPIO_0_DEV->PTOR |= (1 << GPIO_0_PIN);
+            GPIO_0_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_0_PIN);
             break;
 #endif
 #if GPIO_1_EN
 
         case GPIO_1:
-            GPIO_1_DEV->PTOR |= (1 << GPIO_1_PIN);
+            GPIO_1_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_1_PIN);
             break;
 #endif
 #if GPIO_2_EN
 
         case GPIO_2:
-            GPIO_2_DEV->PTOR |= (1 << GPIO_2_PIN);
+            GPIO_2_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_2_PIN);
             break;
 #endif
 #if GPIO_3_EN
 
         case GPIO_3:
-            GPIO_3_DEV->PTOR |= (1 << GPIO_3_PIN);
+            GPIO_3_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_3_PIN);
             break;
 #endif
 #if GPIO_4_EN
 
         case GPIO_4:
-            GPIO_4_DEV->PTOR |= (1 << GPIO_4_PIN);
+            GPIO_4_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_4_PIN);
             break;
 #endif
 #if GPIO_5_EN
 
         case GPIO_5:
-            GPIO_5_DEV->PTOR |= (1 << GPIO_5_PIN);
+            GPIO_5_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_5_PIN);
             break;
 #endif
 #if GPIO_6_EN
 
         case GPIO_6:
-            GPIO_6_DEV->PTOR |= (1 << GPIO_6_PIN);
+            GPIO_6_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_6_PIN);
             break;
 #endif
 #if GPIO_7_EN
 
         case GPIO_7:
-            GPIO_7_DEV->PTOR |= (1 << GPIO_7_PIN);
+            GPIO_7_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_7_PIN);
             break;
 #endif
 #if GPIO_8_EN
 
         case GPIO_8:
-            GPIO_8_DEV->PTOR |= (1 << GPIO_8_PIN);
+            GPIO_8_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_8_PIN);
             break;
 #endif
 #if GPIO_9_EN
 
         case GPIO_9:
-            GPIO_9_DEV->PTOR |= (1 << GPIO_9_PIN);
+            GPIO_9_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_9_PIN);
             break;
 #endif
 #if GPIO_10_EN
 
         case GPIO_10:
-            GPIO_10_DEV->PTOR |= (1 << GPIO_10_PIN);
+            GPIO_10_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_10_PIN);
             break;
 #endif
 #if GPIO_11_EN
 
         case GPIO_11:
-            GPIO_11_DEV->PTOR |= (1 << GPIO_11_PIN);
+            GPIO_11_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_11_PIN);
             break;
 #endif
 #if GPIO_12_EN
 
         case GPIO_12:
-            GPIO_12_DEV->PTOR |= (1 << GPIO_12_PIN);
+            GPIO_12_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_12_PIN);
             break;
 #endif
 #if GPIO_13_EN
 
         case GPIO_13:
-            GPIO_13_DEV->PTOR |= (1 << GPIO_13_PIN);
+            GPIO_13_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_13_PIN);
             break;
 #endif
 #if GPIO_14_EN
 
         case GPIO_14:
-            GPIO_14_DEV->PTOR |= (1 << GPIO_14_PIN);
+            GPIO_14_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_14_PIN);
             break;
 #endif
 #if GPIO_15_EN
 
         case GPIO_15:
-            GPIO_15_DEV->PTOR |= (1 << GPIO_15_PIN);
+            GPIO_15_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_15_PIN);
             break;
 #endif
 #if GPIO_16_EN
 
         case GPIO_16:
-            GPIO_16_DEV->PTOR |= (1 << GPIO_16_PIN);
+            GPIO_16_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_16_PIN);
             break;
 #endif
 #if GPIO_17_EN
 
         case GPIO_17:
-            GPIO_17_DEV->PTOR |= (1 << GPIO_17_PIN);
+            GPIO_17_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_17_PIN);
             break;
 #endif
 #if GPIO_18_EN
 
         case GPIO_18:
-            GPIO_18_DEV->PTOR |= (1 << GPIO_18_PIN);
+            GPIO_18_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_18_PIN);
             break;
 #endif
 #if GPIO_19_EN
 
         case GPIO_19:
-            GPIO_19_DEV->PTOR |= (1 << GPIO_19_PIN);
+            GPIO_19_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_19_PIN);
             break;
 #endif
 #if GPIO_20_EN
 
         case GPIO_20:
-            GPIO_20_DEV->PTOR |= (1 << GPIO_20_PIN);
+            GPIO_20_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_20_PIN);
             break;
 #endif
 #if GPIO_21_EN
 
         case GPIO_21:
-            GPIO_21_DEV->PTOR |= (1 << GPIO_21_PIN);
+            GPIO_21_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_21_PIN);
             break;
 #endif
 #if GPIO_22_EN
 
         case GPIO_22:
-            GPIO_22_DEV->PTOR |= (1 << GPIO_22_PIN);
+            GPIO_22_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_22_PIN);
             break;
 #endif
 #if GPIO_23_EN
 
         case GPIO_23:
-            GPIO_23_DEV->PTOR |= (1 << GPIO_23_PIN);
+            GPIO_23_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_23_PIN);
             break;
 #endif
 #if GPIO_24_EN
 
         case GPIO_24:
-            GPIO_24_DEV->PTOR |= (1 << GPIO_24_PIN);
+            GPIO_24_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_24_PIN);
             break;
 #endif
 #if GPIO_25_EN
 
         case GPIO_25:
-            GPIO_25_DEV->PTOR |= (1 << GPIO_25_PIN);
+            GPIO_25_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_25_PIN);
             break;
 #endif
 #if GPIO_26_EN
 
         case GPIO_26:
-            GPIO_26_DEV->PTOR |= (1 << GPIO_26_PIN);
+            GPIO_26_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_26_PIN);
             break;
 #endif
 #if GPIO_27_EN
 
         case GPIO_27:
-            GPIO_27_DEV->PTOR |= (1 << GPIO_27_PIN);
+            GPIO_27_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_27_PIN);
             break;
 #endif
 #if GPIO_28_EN
 
         case GPIO_28:
-            GPIO_28_DEV->PTOR |= (1 << GPIO_28_PIN);
+            GPIO_28_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_28_PIN);
             break;
 #endif
 #if GPIO_29_EN
 
         case GPIO_29:
-            GPIO_29_DEV->PTOR |= (1 << GPIO_29_PIN);
+            GPIO_29_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_29_PIN);
             break;
 #endif
 #if GPIO_30_EN
 
         case GPIO_30:
-            GPIO_30_DEV->PTOR |= (1 << GPIO_30_PIN);
+            GPIO_30_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_30_PIN);
             break;
 #endif
 #if GPIO_31_EN
 
         case GPIO_31:
-            GPIO_31_DEV->PTOR |= (1 << GPIO_31_PIN);
+            GPIO_31_DEV->PTOR |= GPIO_PTOR_PTTO(1 << GPIO_31_PIN);
             break;
 #endif
     }
@@ -1873,19 +2406,1115 @@ static inline void irq_handler(gpio_t dev)
     }
 }
 
-void isr_portb(void)
-{
-    if (PORTB->ISFR & (1 << GPIO_1_PIN)) {
-        PORTB->ISFR |= (1 << GPIO_1_PIN);
-        irq_handler(GPIO_1);
-    }
-}
 
-void GPIO_0_ISR(void)
-{
-    if (PORTD->ISFR & (1 << GPIO_0_PIN)) {
-        PORTD->ISFR |= (1 << GPIO_0_PIN);
-        irq_handler(GPIO_0);
+/* the following interrupt handlers are quite ugly, the preprocessor is used to
+ * insert only the relevant checks in each isr, however, in the source all of
+ * the ISRs contain all GPIO checks...
+ */
+#define GPIO_ISR_TEMPLATE(gpio) \
+    if (gpio##_PORT->ISFR & PORT_ISFR_ISF(1 << gpio##_PIN)) { \
+        irq_handler(gpio); \
+        /* clear status bit by writing a 1 to it */ \
+        gpio##_PORT->ISFR = PORT_ISFR_ISF(1 << gpio##_PIN); \
     }
-}
+
+/* Generate the below part with: (in bash or zsh)
+for p in $(seq 8 | tr 123456789 abcdefghi); do echo -n "
+#if PORT$(echo $p | tr '[:lower:]' '[:upper:]')_BASE
+void ISR_PORT_${p}(void)
+{
+"; for f in $(seq 0 31); do echo -n "
+#if GPIO_${f}_EN && (GPIO_${f}_PORT_BASE == PORT$(echo $p | tr '[:lower:]' '[:upper:]')_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_${f})
 #endif
+"; done;
+echo -n "
+}
+#endif // PORT$(echo $p | tr '[:lower:]' '[:upper:]')_BASE
+"; done > gpio-isr.c
+*/
+
+/* Script generated code below. */
+/* -------------------------------------------------------------------------- */
+
+#if PORTA_BASE
+void ISR_PORT_A(void)
+{
+
+#if GPIO_0_EN && (GPIO_0_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_0)
+#endif
+
+#if GPIO_1_EN && (GPIO_1_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_1)
+#endif
+
+#if GPIO_2_EN && (GPIO_2_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_2)
+#endif
+
+#if GPIO_3_EN && (GPIO_3_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_3)
+#endif
+
+#if GPIO_4_EN && (GPIO_4_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_4)
+#endif
+
+#if GPIO_5_EN && (GPIO_5_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_5)
+#endif
+
+#if GPIO_6_EN && (GPIO_6_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_6)
+#endif
+
+#if GPIO_7_EN && (GPIO_7_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_7)
+#endif
+
+#if GPIO_8_EN && (GPIO_8_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_8)
+#endif
+
+#if GPIO_9_EN && (GPIO_9_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_9)
+#endif
+
+#if GPIO_10_EN && (GPIO_10_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_10)
+#endif
+
+#if GPIO_11_EN && (GPIO_11_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_11)
+#endif
+
+#if GPIO_12_EN && (GPIO_12_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_12)
+#endif
+
+#if GPIO_13_EN && (GPIO_13_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_13)
+#endif
+
+#if GPIO_14_EN && (GPIO_14_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_14)
+#endif
+
+#if GPIO_15_EN && (GPIO_15_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_15)
+#endif
+
+#if GPIO_16_EN && (GPIO_16_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_16)
+#endif
+
+#if GPIO_17_EN && (GPIO_17_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_17)
+#endif
+
+#if GPIO_18_EN && (GPIO_18_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_18)
+#endif
+
+#if GPIO_19_EN && (GPIO_19_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_19)
+#endif
+
+#if GPIO_20_EN && (GPIO_20_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_20)
+#endif
+
+#if GPIO_21_EN && (GPIO_21_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_21)
+#endif
+
+#if GPIO_22_EN && (GPIO_22_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_22)
+#endif
+
+#if GPIO_23_EN && (GPIO_23_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_23)
+#endif
+
+#if GPIO_24_EN && (GPIO_24_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_24)
+#endif
+
+#if GPIO_25_EN && (GPIO_25_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_25)
+#endif
+
+#if GPIO_26_EN && (GPIO_26_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_26)
+#endif
+
+#if GPIO_27_EN && (GPIO_27_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_27)
+#endif
+
+#if GPIO_28_EN && (GPIO_28_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_28)
+#endif
+
+#if GPIO_29_EN && (GPIO_29_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_29)
+#endif
+
+#if GPIO_30_EN && (GPIO_30_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_30)
+#endif
+
+#if GPIO_31_EN && (GPIO_31_PORT_BASE == PORTA_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_31)
+#endif
+
+}
+#endif /* PORTA_BASE */
+
+#if PORTB_BASE
+void ISR_PORT_B(void)
+{
+
+#if GPIO_0_EN && (GPIO_0_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_0)
+#endif
+
+#if GPIO_1_EN && (GPIO_1_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_1)
+#endif
+
+#if GPIO_2_EN && (GPIO_2_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_2)
+#endif
+
+#if GPIO_3_EN && (GPIO_3_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_3)
+#endif
+
+#if GPIO_4_EN && (GPIO_4_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_4)
+#endif
+
+#if GPIO_5_EN && (GPIO_5_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_5)
+#endif
+
+#if GPIO_6_EN && (GPIO_6_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_6)
+#endif
+
+#if GPIO_7_EN && (GPIO_7_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_7)
+#endif
+
+#if GPIO_8_EN && (GPIO_8_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_8)
+#endif
+
+#if GPIO_9_EN && (GPIO_9_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_9)
+#endif
+
+#if GPIO_10_EN && (GPIO_10_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_10)
+#endif
+
+#if GPIO_11_EN && (GPIO_11_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_11)
+#endif
+
+#if GPIO_12_EN && (GPIO_12_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_12)
+#endif
+
+#if GPIO_13_EN && (GPIO_13_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_13)
+#endif
+
+#if GPIO_14_EN && (GPIO_14_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_14)
+#endif
+
+#if GPIO_15_EN && (GPIO_15_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_15)
+#endif
+
+#if GPIO_16_EN && (GPIO_16_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_16)
+#endif
+
+#if GPIO_17_EN && (GPIO_17_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_17)
+#endif
+
+#if GPIO_18_EN && (GPIO_18_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_18)
+#endif
+
+#if GPIO_19_EN && (GPIO_19_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_19)
+#endif
+
+#if GPIO_20_EN && (GPIO_20_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_20)
+#endif
+
+#if GPIO_21_EN && (GPIO_21_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_21)
+#endif
+
+#if GPIO_22_EN && (GPIO_22_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_22)
+#endif
+
+#if GPIO_23_EN && (GPIO_23_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_23)
+#endif
+
+#if GPIO_24_EN && (GPIO_24_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_24)
+#endif
+
+#if GPIO_25_EN && (GPIO_25_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_25)
+#endif
+
+#if GPIO_26_EN && (GPIO_26_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_26)
+#endif
+
+#if GPIO_27_EN && (GPIO_27_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_27)
+#endif
+
+#if GPIO_28_EN && (GPIO_28_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_28)
+#endif
+
+#if GPIO_29_EN && (GPIO_29_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_29)
+#endif
+
+#if GPIO_30_EN && (GPIO_30_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_30)
+#endif
+
+#if GPIO_31_EN && (GPIO_31_PORT_BASE == PORTB_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_31)
+#endif
+
+}
+#endif /* PORTB_BASE */
+
+#if PORTC_BASE
+void ISR_PORT_C(void)
+{
+
+#if GPIO_0_EN && (GPIO_0_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_0)
+#endif
+
+#if GPIO_1_EN && (GPIO_1_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_1)
+#endif
+
+#if GPIO_2_EN && (GPIO_2_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_2)
+#endif
+
+#if GPIO_3_EN && (GPIO_3_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_3)
+#endif
+
+#if GPIO_4_EN && (GPIO_4_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_4)
+#endif
+
+#if GPIO_5_EN && (GPIO_5_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_5)
+#endif
+
+#if GPIO_6_EN && (GPIO_6_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_6)
+#endif
+
+#if GPIO_7_EN && (GPIO_7_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_7)
+#endif
+
+#if GPIO_8_EN && (GPIO_8_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_8)
+#endif
+
+#if GPIO_9_EN && (GPIO_9_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_9)
+#endif
+
+#if GPIO_10_EN && (GPIO_10_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_10)
+#endif
+
+#if GPIO_11_EN && (GPIO_11_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_11)
+#endif
+
+#if GPIO_12_EN && (GPIO_12_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_12)
+#endif
+
+#if GPIO_13_EN && (GPIO_13_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_13)
+#endif
+
+#if GPIO_14_EN && (GPIO_14_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_14)
+#endif
+
+#if GPIO_15_EN && (GPIO_15_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_15)
+#endif
+
+#if GPIO_16_EN && (GPIO_16_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_16)
+#endif
+
+#if GPIO_17_EN && (GPIO_17_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_17)
+#endif
+
+#if GPIO_18_EN && (GPIO_18_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_18)
+#endif
+
+#if GPIO_19_EN && (GPIO_19_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_19)
+#endif
+
+#if GPIO_20_EN && (GPIO_20_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_20)
+#endif
+
+#if GPIO_21_EN && (GPIO_21_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_21)
+#endif
+
+#if GPIO_22_EN && (GPIO_22_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_22)
+#endif
+
+#if GPIO_23_EN && (GPIO_23_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_23)
+#endif
+
+#if GPIO_24_EN && (GPIO_24_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_24)
+#endif
+
+#if GPIO_25_EN && (GPIO_25_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_25)
+#endif
+
+#if GPIO_26_EN && (GPIO_26_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_26)
+#endif
+
+#if GPIO_27_EN && (GPIO_27_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_27)
+#endif
+
+#if GPIO_28_EN && (GPIO_28_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_28)
+#endif
+
+#if GPIO_29_EN && (GPIO_29_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_29)
+#endif
+
+#if GPIO_30_EN && (GPIO_30_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_30)
+#endif
+
+#if GPIO_31_EN && (GPIO_31_PORT_BASE == PORTC_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_31)
+#endif
+
+}
+#endif /* PORTC_BASE */
+
+#if PORTD_BASE
+void ISR_PORT_D(void)
+{
+
+#if GPIO_0_EN && (GPIO_0_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_0)
+#endif
+
+#if GPIO_1_EN && (GPIO_1_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_1)
+#endif
+
+#if GPIO_2_EN && (GPIO_2_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_2)
+#endif
+
+#if GPIO_3_EN && (GPIO_3_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_3)
+#endif
+
+#if GPIO_4_EN && (GPIO_4_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_4)
+#endif
+
+#if GPIO_5_EN && (GPIO_5_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_5)
+#endif
+
+#if GPIO_6_EN && (GPIO_6_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_6)
+#endif
+
+#if GPIO_7_EN && (GPIO_7_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_7)
+#endif
+
+#if GPIO_8_EN && (GPIO_8_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_8)
+#endif
+
+#if GPIO_9_EN && (GPIO_9_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_9)
+#endif
+
+#if GPIO_10_EN && (GPIO_10_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_10)
+#endif
+
+#if GPIO_11_EN && (GPIO_11_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_11)
+#endif
+
+#if GPIO_12_EN && (GPIO_12_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_12)
+#endif
+
+#if GPIO_13_EN && (GPIO_13_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_13)
+#endif
+
+#if GPIO_14_EN && (GPIO_14_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_14)
+#endif
+
+#if GPIO_15_EN && (GPIO_15_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_15)
+#endif
+
+#if GPIO_16_EN && (GPIO_16_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_16)
+#endif
+
+#if GPIO_17_EN && (GPIO_17_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_17)
+#endif
+
+#if GPIO_18_EN && (GPIO_18_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_18)
+#endif
+
+#if GPIO_19_EN && (GPIO_19_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_19)
+#endif
+
+#if GPIO_20_EN && (GPIO_20_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_20)
+#endif
+
+#if GPIO_21_EN && (GPIO_21_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_21)
+#endif
+
+#if GPIO_22_EN && (GPIO_22_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_22)
+#endif
+
+#if GPIO_23_EN && (GPIO_23_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_23)
+#endif
+
+#if GPIO_24_EN && (GPIO_24_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_24)
+#endif
+
+#if GPIO_25_EN && (GPIO_25_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_25)
+#endif
+
+#if GPIO_26_EN && (GPIO_26_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_26)
+#endif
+
+#if GPIO_27_EN && (GPIO_27_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_27)
+#endif
+
+#if GPIO_28_EN && (GPIO_28_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_28)
+#endif
+
+#if GPIO_29_EN && (GPIO_29_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_29)
+#endif
+
+#if GPIO_30_EN && (GPIO_30_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_30)
+#endif
+
+#if GPIO_31_EN && (GPIO_31_PORT_BASE == PORTD_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_31)
+#endif
+
+}
+#endif /* PORTD_BASE */
+
+#if PORTE_BASE
+void ISR_PORT_E(void)
+{
+
+#if GPIO_0_EN && (GPIO_0_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_0)
+#endif
+
+#if GPIO_1_EN && (GPIO_1_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_1)
+#endif
+
+#if GPIO_2_EN && (GPIO_2_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_2)
+#endif
+
+#if GPIO_3_EN && (GPIO_3_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_3)
+#endif
+
+#if GPIO_4_EN && (GPIO_4_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_4)
+#endif
+
+#if GPIO_5_EN && (GPIO_5_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_5)
+#endif
+
+#if GPIO_6_EN && (GPIO_6_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_6)
+#endif
+
+#if GPIO_7_EN && (GPIO_7_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_7)
+#endif
+
+#if GPIO_8_EN && (GPIO_8_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_8)
+#endif
+
+#if GPIO_9_EN && (GPIO_9_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_9)
+#endif
+
+#if GPIO_10_EN && (GPIO_10_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_10)
+#endif
+
+#if GPIO_11_EN && (GPIO_11_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_11)
+#endif
+
+#if GPIO_12_EN && (GPIO_12_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_12)
+#endif
+
+#if GPIO_13_EN && (GPIO_13_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_13)
+#endif
+
+#if GPIO_14_EN && (GPIO_14_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_14)
+#endif
+
+#if GPIO_15_EN && (GPIO_15_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_15)
+#endif
+
+#if GPIO_16_EN && (GPIO_16_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_16)
+#endif
+
+#if GPIO_17_EN && (GPIO_17_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_17)
+#endif
+
+#if GPIO_18_EN && (GPIO_18_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_18)
+#endif
+
+#if GPIO_19_EN && (GPIO_19_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_19)
+#endif
+
+#if GPIO_20_EN && (GPIO_20_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_20)
+#endif
+
+#if GPIO_21_EN && (GPIO_21_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_21)
+#endif
+
+#if GPIO_22_EN && (GPIO_22_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_22)
+#endif
+
+#if GPIO_23_EN && (GPIO_23_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_23)
+#endif
+
+#if GPIO_24_EN && (GPIO_24_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_24)
+#endif
+
+#if GPIO_25_EN && (GPIO_25_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_25)
+#endif
+
+#if GPIO_26_EN && (GPIO_26_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_26)
+#endif
+
+#if GPIO_27_EN && (GPIO_27_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_27)
+#endif
+
+#if GPIO_28_EN && (GPIO_28_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_28)
+#endif
+
+#if GPIO_29_EN && (GPIO_29_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_29)
+#endif
+
+#if GPIO_30_EN && (GPIO_30_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_30)
+#endif
+
+#if GPIO_31_EN && (GPIO_31_PORT_BASE == PORTE_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_31)
+#endif
+
+}
+#endif /* PORTE_BASE */
+
+#if PORTF_BASE
+void ISR_PORT_F(void)
+{
+
+#if GPIO_0_EN && (GPIO_0_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_0)
+#endif
+
+#if GPIO_1_EN && (GPIO_1_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_1)
+#endif
+
+#if GPIO_2_EN && (GPIO_2_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_2)
+#endif
+
+#if GPIO_3_EN && (GPIO_3_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_3)
+#endif
+
+#if GPIO_4_EN && (GPIO_4_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_4)
+#endif
+
+#if GPIO_5_EN && (GPIO_5_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_5)
+#endif
+
+#if GPIO_6_EN && (GPIO_6_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_6)
+#endif
+
+#if GPIO_7_EN && (GPIO_7_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_7)
+#endif
+
+#if GPIO_8_EN && (GPIO_8_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_8)
+#endif
+
+#if GPIO_9_EN && (GPIO_9_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_9)
+#endif
+
+#if GPIO_10_EN && (GPIO_10_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_10)
+#endif
+
+#if GPIO_11_EN && (GPIO_11_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_11)
+#endif
+
+#if GPIO_12_EN && (GPIO_12_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_12)
+#endif
+
+#if GPIO_13_EN && (GPIO_13_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_13)
+#endif
+
+#if GPIO_14_EN && (GPIO_14_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_14)
+#endif
+
+#if GPIO_15_EN && (GPIO_15_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_15)
+#endif
+
+#if GPIO_16_EN && (GPIO_16_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_16)
+#endif
+
+#if GPIO_17_EN && (GPIO_17_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_17)
+#endif
+
+#if GPIO_18_EN && (GPIO_18_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_18)
+#endif
+
+#if GPIO_19_EN && (GPIO_19_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_19)
+#endif
+
+#if GPIO_20_EN && (GPIO_20_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_20)
+#endif
+
+#if GPIO_21_EN && (GPIO_21_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_21)
+#endif
+
+#if GPIO_22_EN && (GPIO_22_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_22)
+#endif
+
+#if GPIO_23_EN && (GPIO_23_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_23)
+#endif
+
+#if GPIO_24_EN && (GPIO_24_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_24)
+#endif
+
+#if GPIO_25_EN && (GPIO_25_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_25)
+#endif
+
+#if GPIO_26_EN && (GPIO_26_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_26)
+#endif
+
+#if GPIO_27_EN && (GPIO_27_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_27)
+#endif
+
+#if GPIO_28_EN && (GPIO_28_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_28)
+#endif
+
+#if GPIO_29_EN && (GPIO_29_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_29)
+#endif
+
+#if GPIO_30_EN && (GPIO_30_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_30)
+#endif
+
+#if GPIO_31_EN && (GPIO_31_PORT_BASE == PORTF_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_31)
+#endif
+
+}
+#endif /* PORTF_BASE */
+
+#if PORTG_BASE
+void ISR_PORT_G(void)
+{
+
+#if GPIO_0_EN && (GPIO_0_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_0)
+#endif
+
+#if GPIO_1_EN && (GPIO_1_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_1)
+#endif
+
+#if GPIO_2_EN && (GPIO_2_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_2)
+#endif
+
+#if GPIO_3_EN && (GPIO_3_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_3)
+#endif
+
+#if GPIO_4_EN && (GPIO_4_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_4)
+#endif
+
+#if GPIO_5_EN && (GPIO_5_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_5)
+#endif
+
+#if GPIO_6_EN && (GPIO_6_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_6)
+#endif
+
+#if GPIO_7_EN && (GPIO_7_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_7)
+#endif
+
+#if GPIO_8_EN && (GPIO_8_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_8)
+#endif
+
+#if GPIO_9_EN && (GPIO_9_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_9)
+#endif
+
+#if GPIO_10_EN && (GPIO_10_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_10)
+#endif
+
+#if GPIO_11_EN && (GPIO_11_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_11)
+#endif
+
+#if GPIO_12_EN && (GPIO_12_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_12)
+#endif
+
+#if GPIO_13_EN && (GPIO_13_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_13)
+#endif
+
+#if GPIO_14_EN && (GPIO_14_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_14)
+#endif
+
+#if GPIO_15_EN && (GPIO_15_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_15)
+#endif
+
+#if GPIO_16_EN && (GPIO_16_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_16)
+#endif
+
+#if GPIO_17_EN && (GPIO_17_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_17)
+#endif
+
+#if GPIO_18_EN && (GPIO_18_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_18)
+#endif
+
+#if GPIO_19_EN && (GPIO_19_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_19)
+#endif
+
+#if GPIO_20_EN && (GPIO_20_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_20)
+#endif
+
+#if GPIO_21_EN && (GPIO_21_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_21)
+#endif
+
+#if GPIO_22_EN && (GPIO_22_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_22)
+#endif
+
+#if GPIO_23_EN && (GPIO_23_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_23)
+#endif
+
+#if GPIO_24_EN && (GPIO_24_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_24)
+#endif
+
+#if GPIO_25_EN && (GPIO_25_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_25)
+#endif
+
+#if GPIO_26_EN && (GPIO_26_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_26)
+#endif
+
+#if GPIO_27_EN && (GPIO_27_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_27)
+#endif
+
+#if GPIO_28_EN && (GPIO_28_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_28)
+#endif
+
+#if GPIO_29_EN && (GPIO_29_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_29)
+#endif
+
+#if GPIO_30_EN && (GPIO_30_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_30)
+#endif
+
+#if GPIO_31_EN && (GPIO_31_PORT_BASE == PORTG_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_31)
+#endif
+
+}
+#endif /* PORTG_BASE */
+
+#if PORTH_BASE
+void ISR_PORT_H(void)
+{
+
+#if GPIO_0_EN && (GPIO_0_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_0)
+#endif
+
+#if GPIO_1_EN && (GPIO_1_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_1)
+#endif
+
+#if GPIO_2_EN && (GPIO_2_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_2)
+#endif
+
+#if GPIO_3_EN && (GPIO_3_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_3)
+#endif
+
+#if GPIO_4_EN && (GPIO_4_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_4)
+#endif
+
+#if GPIO_5_EN && (GPIO_5_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_5)
+#endif
+
+#if GPIO_6_EN && (GPIO_6_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_6)
+#endif
+
+#if GPIO_7_EN && (GPIO_7_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_7)
+#endif
+
+#if GPIO_8_EN && (GPIO_8_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_8)
+#endif
+
+#if GPIO_9_EN && (GPIO_9_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_9)
+#endif
+
+#if GPIO_10_EN && (GPIO_10_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_10)
+#endif
+
+#if GPIO_11_EN && (GPIO_11_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_11)
+#endif
+
+#if GPIO_12_EN && (GPIO_12_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_12)
+#endif
+
+#if GPIO_13_EN && (GPIO_13_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_13)
+#endif
+
+#if GPIO_14_EN && (GPIO_14_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_14)
+#endif
+
+#if GPIO_15_EN && (GPIO_15_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_15)
+#endif
+
+#if GPIO_16_EN && (GPIO_16_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_16)
+#endif
+
+#if GPIO_17_EN && (GPIO_17_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_17)
+#endif
+
+#if GPIO_18_EN && (GPIO_18_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_18)
+#endif
+
+#if GPIO_19_EN && (GPIO_19_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_19)
+#endif
+
+#if GPIO_20_EN && (GPIO_20_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_20)
+#endif
+
+#if GPIO_21_EN && (GPIO_21_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_21)
+#endif
+
+#if GPIO_22_EN && (GPIO_22_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_22)
+#endif
+
+#if GPIO_23_EN && (GPIO_23_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_23)
+#endif
+
+#if GPIO_24_EN && (GPIO_24_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_24)
+#endif
+
+#if GPIO_25_EN && (GPIO_25_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_25)
+#endif
+
+#if GPIO_26_EN && (GPIO_26_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_26)
+#endif
+
+#if GPIO_27_EN && (GPIO_27_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_27)
+#endif
+
+#if GPIO_28_EN && (GPIO_28_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_28)
+#endif
+
+#if GPIO_29_EN && (GPIO_29_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_29)
+#endif
+
+#if GPIO_30_EN && (GPIO_30_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_30)
+#endif
+
+#if GPIO_31_EN && (GPIO_31_PORT_BASE == PORTH_BASE)
+    GPIO_ISR_TEMPLATE(GPIO_31)
+#endif
+
+}
+#endif /* PORTH_BASE */
+
+#endif /* GPIO_NUMOF */
