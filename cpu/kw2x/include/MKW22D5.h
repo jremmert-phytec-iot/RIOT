@@ -13,6 +13,8 @@
 **     Abstract:
 **         CMSIS Peripheral Access Layer for MK22D5
 **
+**     Adapted for MKW22D5 by Johann Fischer
+**
 **     Copyright (c) 1997 - 2014 Freescale Semiconductor, Inc.
 **     All rights reserved.
 **
@@ -63,17 +65,18 @@
 **     - rev. 1.7 (2014-05-27)
 **         Updated to Kinetis SDK support standard.
 **         MCG OSC clock select supported (MCG_C7[OSCSEL]).
+**     - 2015-01-21 adapted for MKW22D5
 **
 ** ###################################################################
 */
 
 /*!
- * @file MK22D5.h
+ * @file MKW22D5.h
  * @version 1.7
- * @date 2014-05-27
- * @brief CMSIS Peripheral Access Layer for MK22D5
+ * @date 2015-01-21
+ * @brief CMSIS Peripheral Access Layer for MKW22D5
  *
- * CMSIS Peripheral Access Layer for MK22D5
+ * CMSIS Peripheral Access Layer for MKW22D5 (based on MK22D5)
  */
 
 
@@ -187,11 +190,11 @@ typedef enum IRQn {
   DMA_Error_IRQn               = 16,               /**< DMA channel 0 - 15 error */
   MCM_IRQn                     = 17,               /**< MCM normal interrupt */
   FTFL_IRQn                    = 18,               /**< FTFL command complete */
-  Read_Collision_IRQn          = 19,               /**< FTFL read collision */
-  LVD_LVW_IRQn                 = 20,               /**< PMC controller low-voltage detect, low-voltage warning */
-  LLW_IRQn                     = 21,               /**< Low leakage wakeup */
-  Watchdog_IRQn                = 22,               /**< Single interrupt vector for  WDOG and EWM */
-  Reserved39_IRQn              = 23,               /**< Reserved interrupt */
+  FTFL_Collision_IRQn          = 19,               /**< FTFL read collision */
+  PMC_IRQn                     = 20,               /**< PMC controller low-voltage detect, low-voltage warning */
+  LLWU_IRQn                    = 21,               /**< Low leakage wakeup */
+  WDOG_EWM_IRQn                = 22,               /**< Single interrupt vector for  WDOG and EWM */
+  RNG_IRQn                     = 23,               /**< Randon number generator */
   I2C0_IRQn                    = 24,               /**< Inter-integrated circuit 0 */
   I2C1_IRQn                    = 25,               /**< Inter-integrated circuit 1 */
   SPI0_IRQn                    = 26,               /**< Serial peripheral Interface 0 */
@@ -205,8 +208,8 @@ typedef enum IRQn {
   UART1_ERR_IRQn               = 34,               /**< UART1 error interrupt */
   UART2_RX_TX_IRQn             = 35,               /**< UART2 receive/transmit interrupt */
   UART2_ERR_IRQn               = 36,               /**< UART2 error interrupt */
-  UART3_RX_TX_IRQn             = 37,               /**< UART3 receive/transmit interrupt */
-  UART3_ERR_IRQn               = 38,               /**< UART3 error interrupt */
+  Reserved53_IRQn              = 37,               /**< Reserved interrupt */
+  Reserved54_IRQn              = 38,               /**< Reserved interrupt */
   ADC0_IRQn                    = 39,               /**< Analog-to-digital converter 0 */
   CMP0_IRQn                    = 40,               /**< Comparator 0 */
   CMP1_IRQn                    = 41,               /**< Comparator 1 */
@@ -226,7 +229,7 @@ typedef enum IRQn {
   Reserved71_IRQn              = 55,               /**< Reserved interrupt */
   DAC0_IRQn                    = 56,               /**< Digital-to-analog converter 0 */
   MCG_IRQn                     = 57,               /**< Multipurpose clock generator */
-  LPTimer_IRQn                 = 58,               /**< Low power timer interrupt */
+  LPTMR0_IRQn                  = 58,               /**< Low power timer interrupt */
   PORTA_IRQn                   = 59,               /**< Port A pin detect interrupt */
   PORTB_IRQn                   = 60,               /**< Port B pin detect interrupt */
   PORTC_IRQn                   = 61,               /**< Port C pin detect interrupt */
@@ -592,6 +595,142 @@ typedef struct {
  * @}
  */ /* end of group ADC_Peripheral_Access_Layer */
 
+/* ----------------------------------------------------------------------------
+   -- CAU Peripheral Access Layer
+   ---------------------------------------------------------------------------- */
+
+/*!
+ * @addtogroup CAU_Peripheral_Access_Layer CAU Peripheral Access Layer
+ * @{
+ */
+
+/** CAU - Register Layout Typedef */
+typedef struct {
+  __O  uint32_t DIRECT[16];                        /**< Direct access register 0..Direct access register 15, array offset: 0x0, array step: 0x4 */
+       uint8_t RESERVED_0[2048];
+  __O  uint32_t LDR_CASR;                          /**< Status register  - Load Register command, offset: 0x840 */
+  __O  uint32_t LDR_CAA;                           /**< Accumulator register - Load Register command, offset: 0x844 */
+  __O  uint32_t LDR_CA[9];                         /**< General Purpose Register 0 - Load Register command..General Purpose Register 8 - Load Register command, array offset: 0x848, array step: 0x4 */
+       uint8_t RESERVED_1[20];
+  __I  uint32_t STR_CASR;                          /**< Status register  - Store Register command, offset: 0x880 */
+  __I  uint32_t STR_CAA;                           /**< Accumulator register - Store Register command, offset: 0x884 */
+  __I  uint32_t STR_CA[9];                         /**< General Purpose Register 0 - Store Register command..General Purpose Register 8 - Store Register command, array offset: 0x888, array step: 0x4 */
+       uint8_t RESERVED_2[20];
+  __O  uint32_t ADR_CASR;                          /**< Status register  - Add Register command, offset: 0x8C0 */
+  __O  uint32_t ADR_CAA;                           /**< Accumulator register - Add to register command, offset: 0x8C4 */
+  __O  uint32_t ADR_CA[9];                         /**< General Purpose Register 0 - Add to register command..General Purpose Register 8 - Add to register command, array offset: 0x8C8, array step: 0x4 */
+       uint8_t RESERVED_3[20];
+  __O  uint32_t RADR_CASR;                         /**< Status register  - Reverse and Add to Register command, offset: 0x900 */
+  __O  uint32_t RADR_CAA;                          /**< Accumulator register - Reverse and Add to Register command, offset: 0x904 */
+  __O  uint32_t RADR_CA[9];                        /**< General Purpose Register 0 - Reverse and Add to Register command..General Purpose Register 8 - Reverse and Add to Register command, array offset: 0x908, array step: 0x4 */
+       uint8_t RESERVED_4[84];
+  __O  uint32_t XOR_CASR;                          /**< Status register  - Exclusive Or command, offset: 0x980 */
+  __O  uint32_t XOR_CAA;                           /**< Accumulator register - Exclusive Or command, offset: 0x984 */
+  __O  uint32_t XOR_CA[9];                         /**< General Purpose Register 0 - Exclusive Or command..General Purpose Register 8 - Exclusive Or command, array offset: 0x988, array step: 0x4 */
+       uint8_t RESERVED_5[20];
+  __O  uint32_t ROTL_CASR;                         /**< Status register  - Rotate Left command, offset: 0x9C0 */
+  __O  uint32_t ROTL_CAA;                          /**< Accumulator register - Rotate Left command, offset: 0x9C4 */
+  __O  uint32_t ROTL_CA[9];                        /**< General Purpose Register 0 - Rotate Left command..General Purpose Register 8 - Rotate Left command, array offset: 0x9C8, array step: 0x4 */
+       uint8_t RESERVED_6[276];
+  __O  uint32_t AESC_CASR;                         /**< Status register  - AES Column Operation command, offset: 0xB00 */
+  __O  uint32_t AESC_CAA;                          /**< Accumulator register - AES Column Operation command, offset: 0xB04 */
+  __O  uint32_t AESC_CA[9];                        /**< General Purpose Register 0 - AES Column Operation command..General Purpose Register 8 - AES Column Operation command, array offset: 0xB08, array step: 0x4 */
+       uint8_t RESERVED_7[20];
+  __O  uint32_t AESIC_CASR;                        /**< Status register  - AES Inverse Column Operation command, offset: 0xB40 */
+  __O  uint32_t AESIC_CAA;                         /**< Accumulator register - AES Inverse Column Operation command, offset: 0xB44 */
+  __O  uint32_t AESIC_CA[9];                       /**< General Purpose Register 0 - AES Inverse Column Operation command..General Purpose Register 8 - AES Inverse Column Operation command, array offset: 0xB48, array step: 0x4 */
+} CAU_Type;
+
+/* ----------------------------------------------------------------------------
+   -- CAU Register Masks
+   ---------------------------------------------------------------------------- */
+
+/*!
+ * @addtogroup CAU_Register_Masks CAU Register Masks
+ * @{
+ */
+
+/* LDR_CASR Bit Fields */
+#define CAU_LDR_CASR_IC_MASK                     0x1u
+#define CAU_LDR_CASR_IC_SHIFT                    0
+#define CAU_LDR_CASR_DPE_MASK                    0x2u
+#define CAU_LDR_CASR_DPE_SHIFT                   1
+#define CAU_LDR_CASR_VER_MASK                    0xF0000000u
+#define CAU_LDR_CASR_VER_SHIFT                   28
+#define CAU_LDR_CASR_VER(x)                      (((uint32_t)(((uint32_t)(x))<<CAU_LDR_CASR_VER_SHIFT))&CAU_LDR_CASR_VER_MASK)
+/* STR_CASR Bit Fields */
+#define CAU_STR_CASR_IC_MASK                     0x1u
+#define CAU_STR_CASR_IC_SHIFT                    0
+#define CAU_STR_CASR_DPE_MASK                    0x2u
+#define CAU_STR_CASR_DPE_SHIFT                   1
+#define CAU_STR_CASR_VER_MASK                    0xF0000000u
+#define CAU_STR_CASR_VER_SHIFT                   28
+#define CAU_STR_CASR_VER(x)                      (((uint32_t)(((uint32_t)(x))<<CAU_STR_CASR_VER_SHIFT))&CAU_STR_CASR_VER_MASK)
+/* ADR_CASR Bit Fields */
+#define CAU_ADR_CASR_IC_MASK                     0x1u
+#define CAU_ADR_CASR_IC_SHIFT                    0
+#define CAU_ADR_CASR_DPE_MASK                    0x2u
+#define CAU_ADR_CASR_DPE_SHIFT                   1
+#define CAU_ADR_CASR_VER_MASK                    0xF0000000u
+#define CAU_ADR_CASR_VER_SHIFT                   28
+#define CAU_ADR_CASR_VER(x)                      (((uint32_t)(((uint32_t)(x))<<CAU_ADR_CASR_VER_SHIFT))&CAU_ADR_CASR_VER_MASK)
+/* RADR_CASR Bit Fields */
+#define CAU_RADR_CASR_IC_MASK                    0x1u
+#define CAU_RADR_CASR_IC_SHIFT                   0
+#define CAU_RADR_CASR_DPE_MASK                   0x2u
+#define CAU_RADR_CASR_DPE_SHIFT                  1
+#define CAU_RADR_CASR_VER_MASK                   0xF0000000u
+#define CAU_RADR_CASR_VER_SHIFT                  28
+#define CAU_RADR_CASR_VER(x)                     (((uint32_t)(((uint32_t)(x))<<CAU_RADR_CASR_VER_SHIFT))&CAU_RADR_CASR_VER_MASK)
+/* XOR_CASR Bit Fields */
+#define CAU_XOR_CASR_IC_MASK                     0x1u
+#define CAU_XOR_CASR_IC_SHIFT                    0
+#define CAU_XOR_CASR_DPE_MASK                    0x2u
+#define CAU_XOR_CASR_DPE_SHIFT                   1
+#define CAU_XOR_CASR_VER_MASK                    0xF0000000u
+#define CAU_XOR_CASR_VER_SHIFT                   28
+#define CAU_XOR_CASR_VER(x)                      (((uint32_t)(((uint32_t)(x))<<CAU_XOR_CASR_VER_SHIFT))&CAU_XOR_CASR_VER_MASK)
+/* ROTL_CASR Bit Fields */
+#define CAU_ROTL_CASR_IC_MASK                    0x1u
+#define CAU_ROTL_CASR_IC_SHIFT                   0
+#define CAU_ROTL_CASR_DPE_MASK                   0x2u
+#define CAU_ROTL_CASR_DPE_SHIFT                  1
+#define CAU_ROTL_CASR_VER_MASK                   0xF0000000u
+#define CAU_ROTL_CASR_VER_SHIFT                  28
+#define CAU_ROTL_CASR_VER(x)                     (((uint32_t)(((uint32_t)(x))<<CAU_ROTL_CASR_VER_SHIFT))&CAU_ROTL_CASR_VER_MASK)
+/* AESC_CASR Bit Fields */
+#define CAU_AESC_CASR_IC_MASK                    0x1u
+#define CAU_AESC_CASR_IC_SHIFT                   0
+#define CAU_AESC_CASR_DPE_MASK                   0x2u
+#define CAU_AESC_CASR_DPE_SHIFT                  1
+#define CAU_AESC_CASR_VER_MASK                   0xF0000000u
+#define CAU_AESC_CASR_VER_SHIFT                  28
+#define CAU_AESC_CASR_VER(x)                     (((uint32_t)(((uint32_t)(x))<<CAU_AESC_CASR_VER_SHIFT))&CAU_AESC_CASR_VER_MASK)
+/* AESIC_CASR Bit Fields */
+#define CAU_AESIC_CASR_IC_MASK                   0x1u
+#define CAU_AESIC_CASR_IC_SHIFT                  0
+#define CAU_AESIC_CASR_DPE_MASK                  0x2u
+#define CAU_AESIC_CASR_DPE_SHIFT                 1
+#define CAU_AESIC_CASR_VER_MASK                  0xF0000000u
+#define CAU_AESIC_CASR_VER_SHIFT                 28
+#define CAU_AESIC_CASR_VER(x)                    (((uint32_t)(((uint32_t)(x))<<CAU_AESIC_CASR_VER_SHIFT))&CAU_AESIC_CASR_VER_MASK)
+
+/*!
+ * @}
+ */ /* end of group CAU_Register_Masks */
+
+
+/* CAU - Peripheral instance base addresses */
+/** Peripheral CAU base address */
+#define CAU_BASE                                 (0xE0081000u)
+/** Peripheral CAU base pointer */
+#define CAU                                      ((CAU_Type *)CAU_BASE)
+/** Array initializer of CAU peripheral base pointers */
+#define CAU_BASES                                { CAU }
+
+/*!
+ * @}
+ */ /* end of group CAU_Peripheral_Access_Layer */
 
 /* ----------------------------------------------------------------------------
    -- CMP Peripheral Access Layer
@@ -1774,6 +1913,39 @@ typedef struct {
 #define DMA_HRS_HRS14_SHIFT                      14
 #define DMA_HRS_HRS15_MASK                       0x8000u
 #define DMA_HRS_HRS15_SHIFT                      15
+/* EARS Bit Fields */
+#define DMA_EARS_EDREQ_0_MASK                    0x1u
+#define DMA_EARS_EDREQ_0_SHIFT                   0
+#define DMA_EARS_EDREQ_1_MASK                    0x2u
+#define DMA_EARS_EDREQ_1_SHIFT                   1
+#define DMA_EARS_EDREQ_2_MASK                    0x4u
+#define DMA_EARS_EDREQ_2_SHIFT                   2
+#define DMA_EARS_EDREQ_3_MASK                    0x8u
+#define DMA_EARS_EDREQ_3_SHIFT                   3
+#define DMA_EARS_EDREQ_4_MASK                    0x10u
+#define DMA_EARS_EDREQ_4_SHIFT                   4
+#define DMA_EARS_EDREQ_5_MASK                    0x20u
+#define DMA_EARS_EDREQ_5_SHIFT                   5
+#define DMA_EARS_EDREQ_6_MASK                    0x40u
+#define DMA_EARS_EDREQ_6_SHIFT                   6
+#define DMA_EARS_EDREQ_7_MASK                    0x80u
+#define DMA_EARS_EDREQ_7_SHIFT                   7
+#define DMA_EARS_EDREQ_8_MASK                    0x100u
+#define DMA_EARS_EDREQ_8_SHIFT                   8
+#define DMA_EARS_EDREQ_9_MASK                    0x200u
+#define DMA_EARS_EDREQ_9_SHIFT                   9
+#define DMA_EARS_EDREQ_10_MASK                   0x400u
+#define DMA_EARS_EDREQ_10_SHIFT                  10
+#define DMA_EARS_EDREQ_11_MASK                   0x800u
+#define DMA_EARS_EDREQ_11_SHIFT                  11
+#define DMA_EARS_EDREQ_12_MASK                   0x1000u
+#define DMA_EARS_EDREQ_12_SHIFT                  12
+#define DMA_EARS_EDREQ_13_MASK                   0x2000u
+#define DMA_EARS_EDREQ_13_SHIFT                  13
+#define DMA_EARS_EDREQ_14_MASK                   0x4000u
+#define DMA_EARS_EDREQ_14_SHIFT                  14
+#define DMA_EARS_EDREQ_15_MASK                   0x8000u
+#define DMA_EARS_EDREQ_15_SHIFT                  15
 /* DCHPRI3 Bit Fields */
 #define DMA_DCHPRI3_CHPRI_MASK                   0xFu
 #define DMA_DCHPRI3_CHPRI_SHIFT                  0
@@ -6468,213 +6640,84 @@ typedef struct {
 
 
 /* ----------------------------------------------------------------------------
-   -- RFSYS Peripheral Access Layer
+   -- RNG Peripheral Access Layer
    ---------------------------------------------------------------------------- */
 
 /*!
- * @addtogroup RFSYS_Peripheral_Access_Layer RFSYS Peripheral Access Layer
+ * @addtogroup RNG_Peripheral_Access_Layer RNG Peripheral Access Layer
  * @{
  */
 
-/** RFSYS - Register Layout Typedef */
+/** RNG - Register Layout Typedef */
 typedef struct {
-  __IO uint32_t REG[8];                            /**< Register file register, array offset: 0x0, array step: 0x4 */
-} RFSYS_Type, *RFSYS_MemMapPtr;
+  __IO uint32_t CR;                                /**< RNGA Control Register, offset: 0x0 */
+  __I  uint32_t SR;                                /**< RNGA Status Register, offset: 0x4 */
+  __O  uint32_t ER;                                /**< RNGA Entropy Register, offset: 0x8 */
+  __I  uint32_t OR;                                /**< RNGA Output Register, offset: 0xC */
+} RNG_Type;
 
 /* ----------------------------------------------------------------------------
-   -- RFSYS - Register accessor macros
+   -- RNG Register Masks
    ---------------------------------------------------------------------------- */
 
 /*!
- * @addtogroup RFSYS_Register_Accessor_Macros RFSYS - Register accessor macros
+ * @addtogroup RNG_Register_Masks RNG Register Masks
  * @{
  */
 
-
-/* RFSYS - Register accessors */
-#define RFSYS_REG_REG(base,index)                ((base)->REG[index])
-
-/*!
- * @}
- */ /* end of group RFSYS_Register_Accessor_Macros */
-
-
-/* ----------------------------------------------------------------------------
-   -- RFSYS Register Masks
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup RFSYS_Register_Masks RFSYS Register Masks
- * @{
- */
-
-/* REG Bit Fields */
-#define RFSYS_REG_LL_MASK                        0xFFu
-#define RFSYS_REG_LL_SHIFT                       0
-#define RFSYS_REG_LL(x)                          (((uint32_t)(((uint32_t)(x))<<RFSYS_REG_LL_SHIFT))&RFSYS_REG_LL_MASK)
-#define RFSYS_REG_LH_MASK                        0xFF00u
-#define RFSYS_REG_LH_SHIFT                       8
-#define RFSYS_REG_LH(x)                          (((uint32_t)(((uint32_t)(x))<<RFSYS_REG_LH_SHIFT))&RFSYS_REG_LH_MASK)
-#define RFSYS_REG_HL_MASK                        0xFF0000u
-#define RFSYS_REG_HL_SHIFT                       16
-#define RFSYS_REG_HL(x)                          (((uint32_t)(((uint32_t)(x))<<RFSYS_REG_HL_SHIFT))&RFSYS_REG_HL_MASK)
-#define RFSYS_REG_HH_MASK                        0xFF000000u
-#define RFSYS_REG_HH_SHIFT                       24
-#define RFSYS_REG_HH(x)                          (((uint32_t)(((uint32_t)(x))<<RFSYS_REG_HH_SHIFT))&RFSYS_REG_HH_MASK)
-
-/*!
- * @}
- */ /* end of group RFSYS_Register_Masks */
-
-
-/* RFSYS - Peripheral instance base addresses */
-/** Peripheral RFSYS base address */
-#define RFSYS_BASE                               (0x40041000u)
-/** Peripheral RFSYS base pointer */
-#define RFSYS                                    ((RFSYS_Type *)RFSYS_BASE)
-#define RFSYS_BASE_PTR                           (RFSYS)
-/** Array initializer of RFSYS peripheral base addresses */
-#define RFSYS_BASE_ADDRS                         { RFSYS_BASE }
-/** Array initializer of RFSYS peripheral base pointers */
-#define RFSYS_BASE_PTRS                          { RFSYS }
-
-/* ----------------------------------------------------------------------------
-   -- RFSYS - Register accessor macros
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup RFSYS_Register_Accessor_Macros RFSYS - Register accessor macros
- * @{
- */
-
-
-/* RFSYS - Register instance definitions */
-/* RFSYS */
-#define RFSYS_REG0                               RFSYS_REG_REG(RFSYS,0)
-#define RFSYS_REG1                               RFSYS_REG_REG(RFSYS,1)
-#define RFSYS_REG2                               RFSYS_REG_REG(RFSYS,2)
-#define RFSYS_REG3                               RFSYS_REG_REG(RFSYS,3)
-#define RFSYS_REG4                               RFSYS_REG_REG(RFSYS,4)
-#define RFSYS_REG5                               RFSYS_REG_REG(RFSYS,5)
-#define RFSYS_REG6                               RFSYS_REG_REG(RFSYS,6)
-#define RFSYS_REG7                               RFSYS_REG_REG(RFSYS,7)
-
-/* RFSYS - Register array accessors */
-#define RFSYS_REG(index)                         RFSYS_REG_REG(RFSYS,index)
+/* CR Bit Fields */
+#define RNG_CR_GO_MASK                           0x1u
+#define RNG_CR_GO_SHIFT                          0
+#define RNG_CR_HA_MASK                           0x2u
+#define RNG_CR_HA_SHIFT                          1
+#define RNG_CR_INTM_MASK                         0x4u
+#define RNG_CR_INTM_SHIFT                        2
+#define RNG_CR_CLRI_MASK                         0x8u
+#define RNG_CR_CLRI_SHIFT                        3
+#define RNG_CR_SLP_MASK                          0x10u
+#define RNG_CR_SLP_SHIFT                         4
+/* SR Bit Fields */
+#define RNG_SR_SECV_MASK                         0x1u
+#define RNG_SR_SECV_SHIFT                        0
+#define RNG_SR_LRS_MASK                          0x2u
+#define RNG_SR_LRS_SHIFT                         1
+#define RNG_SR_ORU_MASK                          0x4u
+#define RNG_SR_ORU_SHIFT                         2
+#define RNG_SR_ERRI_MASK                         0x8u
+#define RNG_SR_ERRI_SHIFT                        3
+#define RNG_SR_SLP_MASK                          0x10u
+#define RNG_SR_SLP_SHIFT                         4
+#define RNG_SR_OREG_LVL_MASK                     0xFF00u
+#define RNG_SR_OREG_LVL_SHIFT                    8
+#define RNG_SR_OREG_LVL(x)                       (((uint32_t)(((uint32_t)(x))<<RNG_SR_OREG_LVL_SHIFT))&RNG_SR_OREG_LVL_MASK)
+#define RNG_SR_OREG_SIZE_MASK                    0xFF0000u
+#define RNG_SR_OREG_SIZE_SHIFT                   16
+#define RNG_SR_OREG_SIZE(x)                      (((uint32_t)(((uint32_t)(x))<<RNG_SR_OREG_SIZE_SHIFT))&RNG_SR_OREG_SIZE_MASK)
+/* ER Bit Fields */
+#define RNG_ER_EXT_ENT_MASK                      0xFFFFFFFFu
+#define RNG_ER_EXT_ENT_SHIFT                     0
+#define RNG_ER_EXT_ENT(x)                        (((uint32_t)(((uint32_t)(x))<<RNG_ER_EXT_ENT_SHIFT))&RNG_ER_EXT_ENT_MASK)
+/* OR Bit Fields */
+#define RNG_OR_RANDOUT_MASK                      0xFFFFFFFFu
+#define RNG_OR_RANDOUT_SHIFT                     0
+#define RNG_OR_RANDOUT(x)                        (((uint32_t)(((uint32_t)(x))<<RNG_OR_RANDOUT_SHIFT))&RNG_OR_RANDOUT_MASK)
 
 /*!
  * @}
- */ /* end of group RFSYS_Register_Accessor_Macros */
+ */ /* end of group RNG_Register_Masks */
 
 
-/*!
- * @}
- */ /* end of group RFSYS_Peripheral_Access_Layer */
-
-
-/* ----------------------------------------------------------------------------
-   -- RFVBAT Peripheral Access Layer
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup RFVBAT_Peripheral_Access_Layer RFVBAT Peripheral Access Layer
- * @{
- */
-
-/** RFVBAT - Register Layout Typedef */
-typedef struct {
-  __IO uint32_t REG[8];                            /**< VBAT register file register, array offset: 0x0, array step: 0x4 */
-} RFVBAT_Type, *RFVBAT_MemMapPtr;
-
-/* ----------------------------------------------------------------------------
-   -- RFVBAT - Register accessor macros
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup RFVBAT_Register_Accessor_Macros RFVBAT - Register accessor macros
- * @{
- */
-
-
-/* RFVBAT - Register accessors */
-#define RFVBAT_REG_REG(base,index)               ((base)->REG[index])
+/* RNG - Peripheral instance base addresses */
+/** Peripheral RNG base address */
+#define RNG_BASE                                 (0x40029000u)
+/** Peripheral RNG base pointer */
+#define RNG                                      ((RNG_Type *)RNG_BASE)
+/** Array initializer of RNG peripheral base pointers */
+#define RNG_BASES                                { RNG }
 
 /*!
  * @}
- */ /* end of group RFVBAT_Register_Accessor_Macros */
-
-
-/* ----------------------------------------------------------------------------
-   -- RFVBAT Register Masks
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup RFVBAT_Register_Masks RFVBAT Register Masks
- * @{
- */
-
-/* REG Bit Fields */
-#define RFVBAT_REG_LL_MASK                       0xFFu
-#define RFVBAT_REG_LL_SHIFT                      0
-#define RFVBAT_REG_LL(x)                         (((uint32_t)(((uint32_t)(x))<<RFVBAT_REG_LL_SHIFT))&RFVBAT_REG_LL_MASK)
-#define RFVBAT_REG_LH_MASK                       0xFF00u
-#define RFVBAT_REG_LH_SHIFT                      8
-#define RFVBAT_REG_LH(x)                         (((uint32_t)(((uint32_t)(x))<<RFVBAT_REG_LH_SHIFT))&RFVBAT_REG_LH_MASK)
-#define RFVBAT_REG_HL_MASK                       0xFF0000u
-#define RFVBAT_REG_HL_SHIFT                      16
-#define RFVBAT_REG_HL(x)                         (((uint32_t)(((uint32_t)(x))<<RFVBAT_REG_HL_SHIFT))&RFVBAT_REG_HL_MASK)
-#define RFVBAT_REG_HH_MASK                       0xFF000000u
-#define RFVBAT_REG_HH_SHIFT                      24
-#define RFVBAT_REG_HH(x)                         (((uint32_t)(((uint32_t)(x))<<RFVBAT_REG_HH_SHIFT))&RFVBAT_REG_HH_MASK)
-
-/*!
- * @}
- */ /* end of group RFVBAT_Register_Masks */
-
-
-/* RFVBAT - Peripheral instance base addresses */
-/** Peripheral RFVBAT base address */
-#define RFVBAT_BASE                              (0x4003E000u)
-/** Peripheral RFVBAT base pointer */
-#define RFVBAT                                   ((RFVBAT_Type *)RFVBAT_BASE)
-#define RFVBAT_BASE_PTR                          (RFVBAT)
-/** Array initializer of RFVBAT peripheral base addresses */
-#define RFVBAT_BASE_ADDRS                        { RFVBAT_BASE }
-/** Array initializer of RFVBAT peripheral base pointers */
-#define RFVBAT_BASE_PTRS                         { RFVBAT }
-
-/* ----------------------------------------------------------------------------
-   -- RFVBAT - Register accessor macros
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup RFVBAT_Register_Accessor_Macros RFVBAT - Register accessor macros
- * @{
- */
-
-
-/* RFVBAT - Register instance definitions */
-/* RFVBAT */
-#define RFVBAT_REG0                              RFVBAT_REG_REG(RFVBAT,0)
-#define RFVBAT_REG1                              RFVBAT_REG_REG(RFVBAT,1)
-#define RFVBAT_REG2                              RFVBAT_REG_REG(RFVBAT,2)
-#define RFVBAT_REG3                              RFVBAT_REG_REG(RFVBAT,3)
-#define RFVBAT_REG4                              RFVBAT_REG_REG(RFVBAT,4)
-#define RFVBAT_REG5                              RFVBAT_REG_REG(RFVBAT,5)
-#define RFVBAT_REG6                              RFVBAT_REG_REG(RFVBAT,6)
-#define RFVBAT_REG7                              RFVBAT_REG_REG(RFVBAT,7)
-
-/* RFVBAT - Register array accessors */
-#define RFVBAT_REG(index)                        RFVBAT_REG_REG(RFVBAT,index)
-
-/*!
- * @}
- */ /* end of group RFVBAT_Register_Accessor_Macros */
-
-
-/*!
- * @}
- */ /* end of group RFVBAT_Peripheral_Access_Layer */
+ */ /* end of group RNG_Peripheral_Access_Layer */
 
 
 /* ----------------------------------------------------------------------------
@@ -7167,6 +7210,8 @@ typedef struct {
 #define SIM_SCGC6_FTFL_SHIFT                     0
 #define SIM_SCGC6_DMAMUX_MASK                    0x2u
 #define SIM_SCGC6_DMAMUX_SHIFT                   1
+#define SIM_SCGC6_RNGA_MASK                      0x200u
+#define SIM_SCGC6_RNGA_SHIFT                     9
 #define SIM_SCGC6_SPI0_MASK                      0x1000u
 #define SIM_SCGC6_SPI0_SHIFT                     12
 #define SIM_SCGC6_SPI1_MASK                      0x2000u
@@ -8189,15 +8234,10 @@ typedef struct {
 /** Peripheral UART2 base pointer */
 #define UART2                                    ((UART_Type *)UART2_BASE)
 #define UART2_BASE_PTR                           (UART2)
-/** Peripheral UART3 base address */
-#define UART3_BASE                               (0x4006D000u)
-/** Peripheral UART3 base pointer */
-#define UART3                                    ((UART_Type *)UART3_BASE)
-#define UART3_BASE_PTR                           (UART3)
 /** Array initializer of UART peripheral base addresses */
-#define UART_BASE_ADDRS                          { UART0_BASE, UART1_BASE, UART2_BASE, UART3_BASE }
+#define UART_BASE_ADDRS                          { UART0_BASE, UART1_BASE, UART2_BASE}
 /** Array initializer of UART peripheral base pointers */
-#define UART_BASE_PTRS                           { UART0, UART1, UART2, UART3 }
+#define UART_BASE_PTRS                           { UART0, UART1, UART2}
 
 /* ----------------------------------------------------------------------------
    -- UART - Register accessor macros
@@ -8288,29 +8328,6 @@ typedef struct {
 #define UART2_TCFIFO                             UART_TCFIFO_REG(UART2)
 #define UART2_RWFIFO                             UART_RWFIFO_REG(UART2)
 #define UART2_RCFIFO                             UART_RCFIFO_REG(UART2)
-/* UART3 */
-#define UART3_BDH                                UART_BDH_REG(UART3)
-#define UART3_BDL                                UART_BDL_REG(UART3)
-#define UART3_C1                                 UART_C1_REG(UART3)
-#define UART3_C2                                 UART_C2_REG(UART3)
-#define UART3_S1                                 UART_S1_REG(UART3)
-#define UART3_S2                                 UART_S2_REG(UART3)
-#define UART3_C3                                 UART_C3_REG(UART3)
-#define UART3_D                                  UART_D_REG(UART3)
-#define UART3_MA1                                UART_MA1_REG(UART3)
-#define UART3_MA2                                UART_MA2_REG(UART3)
-#define UART3_C4                                 UART_C4_REG(UART3)
-#define UART3_C5                                 UART_C5_REG(UART3)
-#define UART3_ED                                 UART_ED_REG(UART3)
-#define UART3_MODEM                              UART_MODEM_REG(UART3)
-#define UART3_IR                                 UART_IR_REG(UART3)
-#define UART3_PFIFO                              UART_PFIFO_REG(UART3)
-#define UART3_CFIFO                              UART_CFIFO_REG(UART3)
-#define UART3_SFIFO                              UART_SFIFO_REG(UART3)
-#define UART3_TWFIFO                             UART_TWFIFO_REG(UART3)
-#define UART3_TCFIFO                             UART_TCFIFO_REG(UART3)
-#define UART3_RWFIFO                             UART_RWFIFO_REG(UART3)
-#define UART3_RCFIFO                             UART_RCFIFO_REG(UART3)
 
 /*!
  * @}
@@ -8917,109 +8934,6 @@ typedef struct {
 
 
 /* ----------------------------------------------------------------------------
-   -- VREF Peripheral Access Layer
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup VREF_Peripheral_Access_Layer VREF Peripheral Access Layer
- * @{
- */
-
-/** VREF - Register Layout Typedef */
-typedef struct {
-  __IO uint8_t TRM;                                /**< VREF Trim Register, offset: 0x0 */
-  __IO uint8_t SC;                                 /**< VREF Status and Control Register, offset: 0x1 */
-} VREF_Type, *VREF_MemMapPtr;
-
-/* ----------------------------------------------------------------------------
-   -- VREF - Register accessor macros
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup VREF_Register_Accessor_Macros VREF - Register accessor macros
- * @{
- */
-
-
-/* VREF - Register accessors */
-#define VREF_TRM_REG(base)                       ((base)->TRM)
-#define VREF_SC_REG(base)                        ((base)->SC)
-
-/*!
- * @}
- */ /* end of group VREF_Register_Accessor_Macros */
-
-
-/* ----------------------------------------------------------------------------
-   -- VREF Register Masks
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup VREF_Register_Masks VREF Register Masks
- * @{
- */
-
-/* TRM Bit Fields */
-#define VREF_TRM_TRIM_MASK                       0x3Fu
-#define VREF_TRM_TRIM_SHIFT                      0
-#define VREF_TRM_TRIM(x)                         (((uint8_t)(((uint8_t)(x))<<VREF_TRM_TRIM_SHIFT))&VREF_TRM_TRIM_MASK)
-#define VREF_TRM_CHOPEN_MASK                     0x40u
-#define VREF_TRM_CHOPEN_SHIFT                    6
-/* SC Bit Fields */
-#define VREF_SC_MODE_LV_MASK                     0x3u
-#define VREF_SC_MODE_LV_SHIFT                    0
-#define VREF_SC_MODE_LV(x)                       (((uint8_t)(((uint8_t)(x))<<VREF_SC_MODE_LV_SHIFT))&VREF_SC_MODE_LV_MASK)
-#define VREF_SC_VREFST_MASK                      0x4u
-#define VREF_SC_VREFST_SHIFT                     2
-#define VREF_SC_ICOMPEN_MASK                     0x20u
-#define VREF_SC_ICOMPEN_SHIFT                    5
-#define VREF_SC_REGEN_MASK                       0x40u
-#define VREF_SC_REGEN_SHIFT                      6
-#define VREF_SC_VREFEN_MASK                      0x80u
-#define VREF_SC_VREFEN_SHIFT                     7
-
-/*!
- * @}
- */ /* end of group VREF_Register_Masks */
-
-
-/* VREF - Peripheral instance base addresses */
-/** Peripheral VREF base address */
-#define VREF_BASE                                (0x40074000u)
-/** Peripheral VREF base pointer */
-#define VREF                                     ((VREF_Type *)VREF_BASE)
-#define VREF_BASE_PTR                            (VREF)
-/** Array initializer of VREF peripheral base addresses */
-#define VREF_BASE_ADDRS                          { VREF_BASE }
-/** Array initializer of VREF peripheral base pointers */
-#define VREF_BASE_PTRS                           { VREF }
-
-/* ----------------------------------------------------------------------------
-   -- VREF - Register accessor macros
-   ---------------------------------------------------------------------------- */
-
-/*!
- * @addtogroup VREF_Register_Accessor_Macros VREF - Register accessor macros
- * @{
- */
-
-
-/* VREF - Register instance definitions */
-/* VREF */
-#define VREF_TRM                                 VREF_TRM_REG(VREF)
-#define VREF_SC                                  VREF_SC_REG(VREF)
-
-/*!
- * @}
- */ /* end of group VREF_Register_Accessor_Macros */
-
-
-/*!
- * @}
- */ /* end of group VREF_Peripheral_Access_Layer */
-
-
-/* ----------------------------------------------------------------------------
    -- WDOG Peripheral Access Layer
    ---------------------------------------------------------------------------- */
 
@@ -9366,6 +9280,7 @@ typedef struct {
 #define UART_TIDT_TIDT_MASK                      This_symbol_has_been_deprecated
 #define UART_TIDT_TIDT_SHIFT                     This_symbol_has_been_deprecated
 #define UART_TIDT_TIDT(x)                        This_symbol_has_been_deprecated
+#define OSC0                                     ((OSC_Type *)OSC_BASE)
 
 /*!
  * @}
