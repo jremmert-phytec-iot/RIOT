@@ -72,30 +72,13 @@ extern "C"
 #define TRANSCEIVER_BUFFER_SIZE          (3) /**< Buffer Size for Transceiver Module */
 
 /**
- * @name Clock settings for the lptmr timer
+ * @brief MCU specific Low Power Timer settings. 
  */
-#define LPTIMER_CLKSRC_MCGIRCLK          0    /**< internal reference clock (4MHz) */
-#define LPTIMER_CLKSRC_LPO               1    /**< PMC 1kHz output */
-#define LPTIMER_CLKSRC_ERCLK32K          2    /**< RTC clock 32768Hz */
-#define LPTIMER_CLKSRC_OSCERCLK          3    /**< system oscillator output, clock from RF-Part */
-
-#ifndef LPTIMER_CLKSRC
-#define LPTIMER_CLKSRC                   LPTIMER_CLKSRC_LPO    /**< default clock source */
-#endif
-
-#if (LPTIMER_CLKSRC == LPTIMER_CLKSRC_MCGIRCLK)
-#define LPTIMER_CLK_PRESCALE    1
-#define LPTIMER_SPEED           1000000
-#elif (LPTIMER_CLKSRC == LPTIMER_CLKSRC_OSCERCLK)
-#define LPTIMER_CLK_PRESCALE    1
-#define LPTIMER_SPEED           1000000
-#elif (LPTIMER_CLKSRC == LPTIMER_CLKSRC_ERCLK32K)
-#define LPTIMER_CLK_PRESCALE    0
-#define LPTIMER_SPEED           32768
-#else
-#define LPTIMER_CLK_PRESCALE    0
-#define LPTIMER_SPEED           1000
-#endif
+#define LPTIMER_CLKSRC                   LPTIMER_CLKSRC_LPO
+#define LPTIMER_DEV                      (LPTMR0) /**< LPTIMER hardware module */
+#define LPTIMER_CLKEN()                  (SIM->SCGC5 |= SIM_SCGC5_LPTMR_MASK) /**< Enable LPTMR0 clock gate */
+#define LPTIMER_CLKDIS()                 (SIM->SCGC5 &= ~SIM_SCGC5_PTMR_MASK) /**< Disable LPTMR0 clock gate */
+#define LPTIMER_CNR_NEEDS_LATCHING       1 /**< LPTMR.CNR register do not need latching */
 
 /**
  * @name KW2XD SiP internal interconnects between MCU and Modem.
