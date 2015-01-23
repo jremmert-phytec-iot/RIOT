@@ -285,12 +285,16 @@ extern "C"
 #define GPIO_16_EN          0
 #define GPIO_17_EN          0
 #define GPIO_18_EN          0
-#define GPIO_19_EN          0
-#define GPIO_20_EN          0
-#define GPIO_21_EN          0
+#define GPIO_19_EN          1
+#define GPIO_20_EN          1
+#define GPIO_21_EN          1
 #define GPIO_22_EN          1	 /* User Button, use as input */
 #define GPIO_23_EN          1    /* KW2XRF INT */
 #define GPIO_IRQ_PRIO       1
+#define ISR_PORT_A          isr_porta
+#define ISR_PORT_B          isr_portb
+#define ISR_PORT_C          isr_portc
+#define ISR_PORT_D          isr_portd
 
 /* GPIO channel 0 config */
 #define GPIO_0_DEV          GPIOC                   /* DIO2; Arduino compatible connector D10; SPI0_CS0*/
@@ -298,168 +302,144 @@ extern "C"
 #define GPIO_0_PIN          4
 #define GPIO_0_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTC_MASK))
 #define GPIO_0_IRQ          PORTC_IRQn
-#define GPIO_0_ISR          isr_portc
 /* GPIO channel 1 config */
 #define GPIO_1_DEV          GPIOC                   /* DIO3; Arduino compatible connector D13; SPI0_CLK*/
 #define GPIO_1_PORT         PORTC
 #define GPIO_1_PIN          5
 #define GPIO_1_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTC_MASK))
 #define GPIO_1_IRQ          PORTC_IRQn
-#define GPIO_1_ISR          isr_portc
 /* GPIO channel 2 config */
 #define GPIO_2_DEV          GPIOC                   /* DIO4; Arduino compatible connector D11;  SPI0_MOSI*/
 #define GPIO_2_PORT         PORTC
 #define GPIO_2_PIN          6
 #define GPIO_2_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTC_MASK))
 #define GPIO_2_IRQ          PORTC_IRQn
-#define GPIO_2_ISR          isr_portc
 /* GPIO channel 3 config */
 #define GPIO_3_DEV          GPIOC                   /* DIO5; Arduino compatible connector D12;  SPI0_MISO*/
 #define GPIO_3_PORT         PORTC
 #define GPIO_3_PIN          7
 #define GPIO_3_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTC_MASK))
 #define GPIO_3_IRQ          PORTC_IRQn
-#define GPIO_3_ISR          isr_portc
 /* GPIO channel 4 config */
 #define GPIO_4_DEV          GPIOD                   /* DIO7; Arduino compatible connector D0;  UART2_RX*/
 #define GPIO_4_PORT         PORTD
 #define GPIO_4_PIN          2
 #define GPIO_4_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTD_MASK))
 #define GPIO_4_IRQ          PORTD_IRQn
-#define GPIO_4_ISR          isr_portd
 /* GPIO channel 5 config */
 #define GPIO_5_DEV          GPIOD                   /* DIO8; Arduino compatible connector D1;  UART2_TX*/
 #define GPIO_5_PORT         PORTD
 #define GPIO_5_PIN          3
 #define GPIO_5_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTD_MASK))
 #define GPIO_5_IRQ          PORTD_IRQn
-#define GPIO_5_ISR          isr_portd
 /* GPIO channel 6 config */
 #define GPIO_6_DEV          GPIOD                   /* DIO10; Arduino compatible connector A3*/
 #define GPIO_6_PORT         PORTD
 #define GPIO_6_PIN          5
 #define GPIO_6_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTD_MASK))
 #define GPIO_6_IRQ          PORTD_IRQn
-#define GPIO_6_ISR          isr_portd
 /* GPIO channel 7 config */
 #define GPIO_7_DEV          GPIOD                   /* DIO12; Arduino compatible connector A2*/
 #define GPIO_7_PORT         PORTD
 #define GPIO_7_PIN          7
 #define GPIO_7_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTD_MASK))
 #define GPIO_7_IRQ          PORTD_IRQn
-#define GPIO_7_ISR          isr_portd
 /* GPIO channel 8 config */
 #define GPIO_8_DEV          GPIOE                   /* DIO13; Arduino compatible connector A4;  I2CSDA*/
 #define GPIO_8_PORT         PORTE
 #define GPIO_8_PIN          0
 #define GPIO_8_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTE_MASK))
 #define GPIO_8_IRQ          PORTE_IRQn
-#define GPIO_8_ISR          isr_porte
 /* GPIO channel 9 config */
 #define GPIO_9_DEV          GPIOE                   /* DIO14; Arduino compatible connector A5;  I2CSCL*/
 #define GPIO_9_PORT         PORTE
 #define GPIO_9_PIN          1
 #define GPIO_9_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTE_MASK))
 #define GPIO_9_IRQ          PORTE_IRQn
-#define GPIO_9_ISR          isr_porte
 /* GPIO channel 10 config */
 #define GPIO_10_DEV          GPIOE                   /* DIO15; Arduino compatible connector A0*/
 #define GPIO_10_PORT         PORTE
 #define GPIO_10_PIN          2
 #define GPIO_10_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTE_MASK))
 #define GPIO_10_IRQ          PORTE_IRQn
-#define GPIO_10_ISR          isr_porte
 /* GPIO channel 11 config */
 #define GPIO_11_DEV          GPIOE                   /* DIO16; Arduino compatible connector A1*/
 #define GPIO_11_PORT         PORTE
 #define GPIO_11_PIN          3
 #define GPIO_11_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTE_MASK))
 #define GPIO_11_IRQ          PORTE_IRQn
-#define GPIO_11_ISR          isr_porte
 /* GPIO channel 12 config */
 #define GPIO_12_DEV          GPIOE                   /* DIO17; Arduino compatible connector D2*/
 #define GPIO_12_PORT         PORTE
 #define GPIO_12_PIN          4
 #define GPIO_12_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTE_MASK))
 #define GPIO_12_IRQ          PORTE_IRQn
-#define GPIO_12_ISR          isr_porte
 /* GPIO channel 13 config */
 #define GPIO_13_DEV          GPIOE                   /* DIO20; Arduino compatible connector D14, USB OUT3V3*/
 #define GPIO_13_PORT         PORTE
 #define GPIO_13_PIN          18
 #define GPIO_13_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTE_MASK))
 #define GPIO_13_IRQ          PORTE_IRQn
-#define GPIO_13_ISR          isr_porte
 /* GPIO channel 14 config */
 #define GPIO_14_DEV          GPIOE                   /* DIO21; Arduino compatible connector D15, USB VREGIN*/
 #define GPIO_14_PORT         PORTE
 #define GPIO_14_PIN          19
 #define GPIO_14_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTE_MASK))
 #define GPIO_14_IRQ          PORTE_IRQn
-#define GPIO_14_ISR          isr_porte
 /* GPIO channel 15 config */
 #define GPIO_15_DEV          GPIOA                   /* DIO24; Arduino compatible connector D7*/
 #define GPIO_15_PORT         PORTA
 #define GPIO_15_PIN          1
 #define GPIO_15_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTA_MASK))
 #define GPIO_15_IRQ          PORTA_IRQn
-#define GPIO_15_ISR          isr_porta
 /* GPIO channel 16 config */
 #define GPIO_16_DEV          GPIOA                   /* DIO25; Arduino compatible connector D6*/
 #define GPIO_16_PORT         PORTA
 #define GPIO_16_PIN          2
 #define GPIO_16_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTA_MASK))
 #define GPIO_16_IRQ          PORTA_IRQn
-#define GPIO_16_ISR          isr_porta
 /* GPIO channel 17 config */
 #define GPIO_17_DEV          GPIOA                   /* DIO28; Arduino compatible connector D8*/
 #define GPIO_17_PORT         PORTA
 #define GPIO_17_PIN          18
 #define GPIO_17_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTA_MASK))
 #define GPIO_17_IRQ          PORTA_IRQn
-#define GPIO_17_ISR          isr_porta
 /* GPIO channel 18 config */
 #define GPIO_18_DEV          GPIOA                   /* DIO29; Arduino compatible connector D4*/
 #define GPIO_18_PORT         PORTA
 #define GPIO_18_PIN          19
 #define GPIO_18_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTA_MASK))
 #define GPIO_18_IRQ          PORTA_IRQn
-#define GPIO_18_ISR          isr_porta
 /* GPIO channel 19 config */
 #define GPIO_19_DEV          GPIOD                   /* DIO9; Arduino compatible connector D9; LED_G*/
 #define GPIO_19_PORT         PORTD
 #define GPIO_19_PIN          4
 #define GPIO_19_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTD_MASK))
 #define GPIO_19_IRQ          PORTD_IRQn
-#define GPIO_19_ISR          isr_portd
 /* GPIO channel 20 config */
 #define GPIO_20_DEV          GPIOD                   /* DIO11; Arduino compatible connector D5; LED_R*/
 #define GPIO_20_PORT         PORTD
 #define GPIO_20_PIN          6
 #define GPIO_20_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTD_MASK))
 #define GPIO_20_IRQ          PORTD_IRQn
-#define GPIO_20_ISR          isr_portd
 /* GPIO channel 21 config */
 #define GPIO_21_DEV          GPIOA                   /* DIO27; Arduino compatible connector D3; LED_B*/
 #define GPIO_21_PORT         PORTA
 #define GPIO_21_PIN          4
 #define GPIO_21_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTA_MASK))
 #define GPIO_21_IRQ          PORTA_IRQn
-#define GPIO_21_ISR          isr_porta
 /* GPIO channel 22 config */
 #define GPIO_22_DEV          GPIOD                   /* DIO06; Arduino compatible connector --; User_Button*/
 #define GPIO_22_PORT         PORTD
 #define GPIO_22_PIN          1
 #define GPIO_22_CLKEN()      (SIM->SCGC5 |= (SIM_SCGC5_PORTD_MASK))
 #define GPIO_22_IRQ          PORTD_IRQn
-#define GPIO_22_ISR          isr_portd
 /* GPIO channel 23 config */
 #define GPIO_23_DEV          KW2XDRF_GPIO
 #define GPIO_23_PORT         KW2XDRF_PORT
 #define GPIO_23_PIN          KW2XDRF_IRQ_PIN
 #define GPIO_23_CLKEN()      KW2XDRF_PORT_CLKEN()
 #define GPIO_23_IRQ          KW2XDRF_PORT_IRQn
-#define GPIO_23_ISR          isr_portb
 #define GPIO_KW2XDRF         GPIO_23
 /** @} */
 
