@@ -3,7 +3,9 @@
 # Based on iot-lab_M3 debug.sh script.
 # Author: Jonas Remmert j.remmert@phytec.de
 
-echo PBA-D-01 Debug script executed
+red='\033[0;31m'
+green='\033[0;32m'
+NC='\033[0m'
 
 openocd -f"../../boards/pba-d-01-kw2x/dist/mkw22d512.cfg" \ #"${RIOTBOARD}/${BOARD}/dist/mkw22d512.cfg" \
     -c "tcl_port 6333" \
@@ -23,7 +25,7 @@ retval=$(arm-none-eabi-readelf -x .fcfield $2  | awk '/0x00000400/ {print $2 $3 
 unlocked_fcfield="fffffffffffffffffffffffffeffffff"
 
 if [ "$retval" == "$unlocked_fcfield" ]; then
-echo "Flash configuration tested... [OK]"
+echo -e "Flash configuration tested...${green} [OK]${NC}"
 arm-none-eabi-gdb -tui --command=${1} ${2}
 #cgdb -d arm-none-eabi-gdb --command=${1} ${2}
 
@@ -31,6 +33,6 @@ else
 echo "Hexdump, .fcfield of $2"
 retval=$(arm-none-eabi-readelf -x .fcfield $2)
 echo $retval
-echo "Fcfield not fitting to MKW22Dxxx, danger of bricking the device during flash...[abort]"
+echo -e "Fcfield not fitting to MKW22Dxxx, danger of bricking the device during flash...${red} [ABORT]${NC}"
 fi
 kill ${OCD_PID}
