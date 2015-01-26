@@ -85,6 +85,7 @@ extern "C"
  *
  * @{
  */
+#define KW2XDRF_PORT_BASE       PORTB_BASE /**< MCU Port connected to Modem*/
 #define KW2XDRF_PORT            PORTB /**< MCU Port connected to Modem*/
 #define KW2XDRF_GPIO            GPIOB /**< GPIO Device connected to Modem */
 #define KW2XDRF_PORT_IRQn       PORTB_IRQn
