@@ -94,6 +94,7 @@ endif
 ifneq (,$(filter kw2xrf,$(USEMODULE)))
         USEMODULE += netdev_802154
         USEMODULE += ieee802154
+        USEMODULE += transceiver
 endif
 
 ifneq (,$(filter l2_ping,$(USEMODULE)))
