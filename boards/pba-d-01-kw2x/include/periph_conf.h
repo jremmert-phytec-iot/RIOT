@@ -54,29 +54,26 @@ extern "C"
  * @name Timer configuration
  * @{
  */
-#define TIMER_NUMOF         (0U)
-#define TIMER_0_EN          0
-#define TIMER_1_EN          0
-#define TIMER_2_EN          0
-#define TIMER_IRQ_PRIO      1
+#define TIMER_NUMOF                       (1U)
+#define TIMER_0_EN                        1
+#define TIMER_1_EN                        0
+#define TIMER_IRQ_PRIO                    1
+#define TIMER_DEV                         PIT
+#define TIMER_MAX_VALUE                   (0xffffffff)
+#define TIMER_CLOCK                       CLOCK_CORECLOCK
+#define TIMER_CLKEN()                     (SIM->SCGC6 |= (SIM_SCGC6_PIT_MASK))
 
 /* Timer 0 configuration */
-#define TIMER_0_DEV         PIT
-#define TIMER_0_CHANNELS    1
-#define TIMER_0_CLOCK       CLOCK_CORECLOCK
-#define TIMER_0_MAX_VALUE   (0xffffffff)
-#define TIMER_0_CLKEN()     (SIM->SCGC6 |= (SIM_SCGC6_PIT_MASK))
-#define TIMER_0_ISR         isr_pit1
-#define TIMER_0_IRQ_CHAN    PIT1_IRQn
+#define TIMER_0_PRESCALER_CH              0
+#define TIMER_0_COUNTER_CH                1
+#define TIMER_0_ISR                       isr_pit1
+#define TIMER_0_IRQ_CHAN                  PIT1_IRQn
 
 /* Timer 1 configuration */
-#define TIMER_1_DEV         PIT
-#define TIMER_1_CHANNELS    1
-#define TIMER_1_CLOCK       CLOCK_CORECLOCK
-#define TIMER_1_MAX_VALUE   (0xffffffff)
-#define TIMER_1_CLKEN()     (SIM->SCGC6 |= (SIM_SCGC6_PIT_MASK))
-#define TIMER_1_ISR         isr_pit3
-#define TIMER_1_IRQ_CHAN    PIT3_IRQn
+#define TIMER_1_PRESCALER_CH              2
+#define TIMER_1_COUNTER_CH                3
+#define TIMER_1_ISR                       isr_pit3
+#define TIMER_1_IRQ_CHAN                  PIT3_IRQn
 /** @} */
 
 
