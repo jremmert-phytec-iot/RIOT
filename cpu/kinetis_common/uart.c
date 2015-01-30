@@ -63,7 +63,7 @@ static uart_conf_t config[UART_NUMOF];
 
 static inline void kinetis_set_brfa(KINETIS_UART *dev, uint32_t baudrate, uint32_t clk)
 {
-#ifdef KINETIS_UART_ADVANCED
+#if KINETIS_UART_ADVANCED
     /* set baudrate fine adjust (brfa) */
     uint8_t brfa = ((((4 * clk) / baudrate) + 1) / 2) % 32;
     dev->C4 = UART_C4_BRFA(brfa);
@@ -346,7 +346,7 @@ static inline void irq_handler(uart_t uartnum, KINETIS_UART *dev)
         }
     }
 
-#ifndef KINETIS_UART_ADVANCED
+#if (KINETIS_UART_ADVANCED == 0)
     /* clear overrun flag */
     if (dev->S1 & UART_S1_OR_MASK) {
         dev->S1 = UART_S1_OR_MASK;
