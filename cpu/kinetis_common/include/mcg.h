@@ -110,14 +110,16 @@ extern "C"
 {
 #endif
 
-#define KINETIS_MCG_FEI         7 /**< FLL Engaged Internal Mode */
-#define KINETIS_MCG_FEE         6 /**< FLL Engaged External Mode */
-#define KINETIS_MCG_FBI         5 /**< FLL Bypassed Internal Mode */
-#define KINETIS_MCG_FBE         4 /**< FLL Bypassed External Mode */
-#define KINETIS_MCG_BLPI        3 /**< FLL Bypassed Low Power Internal Mode */
-#define KINETIS_MCG_BLPE        2 /**< FLL Bypassed Low Power External Mode */
-#define KINETIS_MCG_PBE         1 /**< PLL Bypassed External Mode */
-#define KINETIS_MCG_PEE         0 /**< PLL Engaged External Mode */
+typedef enum kinetis_mcg_mode {
+    KINETIS_MCG_PEE = 0, /**< PLL Engaged External Mode */
+    KINETIS_MCG_PBE,     /**< PLL Bypassed External Mode */
+    KINETIS_MCG_BLPE,    /**< FLL Bypassed Low Power External Mode */
+    KINETIS_MCG_BLPI,    /**< FLL Bypassed Low Power Internal Mode */
+    KINETIS_MCG_FBE,     /**< FLL Bypassed External Mode */
+    KINETIS_MCG_FBI,     /**< FLL Bypassed Internal Mode */
+    KINETIS_MCG_FEE,     /**< FLL Engaged External Mode */
+    KINETIS_MCG_FEI,     /**< FLL Engaged Internal Mode */
+} kinetis_mcg_mode_t;
 
 uint32_t cpufreq;
 
@@ -125,7 +127,7 @@ uint32_t cpufreq;
  * @brief Initialize the MCG
  *
  */
-int kinetis_mcg_set_mode(uint8_t mode);
+int kinetis_mcg_set_mode(kinetis_mcg_mode_t mode);
 
 #ifdef __cplusplus
 }

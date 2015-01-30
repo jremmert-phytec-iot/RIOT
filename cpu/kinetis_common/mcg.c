@@ -109,18 +109,35 @@ static uint8_t current_mode = KINETIS_MCG_FEI;
 #error "KINETIS_MCG_PLL_FREQ not defined in periph_conf.h"
 #endif
 
+/**
+ * @brief Disable Phase Locked Loop (PLL)
+ *
+ */
 static inline void kinetis_mcg_disable_pll(void)
 {
     MCG->C5 = (uint8_t)0;
     MCG->C6 = (uint8_t)0;
 }
 
-static inline void kinetis_mcg_set_ffl_factor(uint8_t factor)
+/**
+ * @brief Set Frequency Locked Loop (FLL) factor.
+ *
+ * The FLL will lock the DCO frequency to the FLL factor.
+ * FLL factor will be selected by DRST_DRS and DMX32 bits
+ * and depends on KINETIS_MCG_DCO_RANGE value.
+ */
+static inline void kinetis_mcg_set_fll_factor(uint8_t factor)
 {
     MCG->C4 &= ~(uint8_t)(MCG_C4_DMX32_MASK | MCG_C4_DRST_DRS_MASK);
     MCG->C4 |= (uint8_t)(factor);
 }
 
+/**
+ * @brief Enable Oscillator module
+ *
+ * The module settings depend on KINETIS_MCG_ERC_RANGE
+ * KINETIS_MCG_ERC_OSCILLATOR values.
+ */
 static void kinetis_mcg_enable_osc(void)
 {
     if (KINETIS_MCG_ERC_RANGE == 1) {
@@ -157,7 +174,7 @@ static void kinetis_mcg_enable_osc(void)
  */
 static void kinetis_mcg_set_fei(void)
 {
-    kinetis_mcg_set_ffl_factor(KINETIS_MCG_FLL_FACTOR_FEI);
+    kinetis_mcg_set_fll_factor(KINETIS_MCG_FLL_FACTOR_FEI);
     /* enable and select slow internal reference clock */
     MCG->C1 = (uint8_t)(MCG_C1_CLKS(0) | MCG_C1_IREFS_MASK);
 
@@ -184,7 +201,7 @@ static void kinetis_mcg_set_fei(void)
 static void kinetis_mcg_set_fee(void)
 {
     kinetis_mcg_enable_osc();
-    kinetis_mcg_set_ffl_factor(KINETIS_MCG_FLL_FACTOR_FEE);
+    kinetis_mcg_set_fll_factor(KINETIS_MCG_FLL_FACTOR_FEE);
 
     /* select external reference clock and divide factor */
     MCG->C1 = (uint8_t)(MCG_C1_CLKS(0) | MCG_C1_FRDIV(KINETIS_MCG_ERC_FRDIV));
@@ -215,7 +232,7 @@ static void kinetis_mcg_set_fbi(void)
         MCG->C2 = (uint8_t)(0);
     }
 
-    kinetis_mcg_set_ffl_factor(KINETIS_MCG_FLL_FACTOR_FEI);
+    kinetis_mcg_set_fll_factor(KINETIS_MCG_FLL_FACTOR_FEI);
     /* enable and select slow internal reference clock */
     MCG->C1 = (uint8_t)(MCG_C1_CLKS(1) | MCG_C1_IREFS_MASK);
 
@@ -240,7 +257,7 @@ static void kinetis_mcg_set_fbi(void)
 static void kinetis_mcg_set_fbe(void)
 {
     kinetis_mcg_enable_osc();
-    kinetis_mcg_set_ffl_factor(KINETIS_MCG_FLL_FACTOR_FEE);
+    kinetis_mcg_set_fll_factor(KINETIS_MCG_FLL_FACTOR_FEE);
 
     /* FLL is not disabled in bypass mode */
     MCG->C2 &= ~(uint8_t)(MCG_C2_LP_MASK);
@@ -340,7 +357,7 @@ static void kinetis_mcg_set_pee(void)
 }
 
 
-int kinetis_mcg_set_mode(uint8_t mode)
+int kinetis_mcg_set_mode(kinetis_mcg_mode_t mode)
 {
     if (mode > KINETIS_MCG_FEI) {
         return -1;
