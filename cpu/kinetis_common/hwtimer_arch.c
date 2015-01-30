@@ -51,19 +51,19 @@ inline static uint32_t lptmr_get_cnr(void)
 {
 #if LPTIMER_CNR_NEEDS_LATCHING
     /* Write some garbage to CNR to latch the current value */
-    LPTMR0->CNR = 42;
-    return (uint32_t)LPTMR0->CNR;
+    LPTIMER_DEV->CNR = 42;
+    return (uint32_t)LPTIMER_DEV->CNR;
 #else
     /* The early revisions of the Kinetis CPUs do not need latching of the CNR
      * register. However, this may lead to corrupt values, we read it twice to
      * ensure that we got a valid value */
     int i;
     uint32_t tmp;
-    uint32_t cnr = LPTMR0->CNR;
+    uint32_t cnr = LPTIMER_DEV->CNR;
 
     /* you get three retries */
     for (i = 0; i < 3; ++i) {
-        tmp = LPTMR0->CNR;
+        tmp = LPTIMER_DEV->CNR;
 
         if (tmp == cnr) {
             return cnr;
@@ -89,7 +89,7 @@ void hwtimer_arch_init(void (*handler)(int), uint32_t fcpu)
 {
     timeout_handler = handler;
 
-    /* unlock LPTMR0 */
+    /* unlock LPTIMER_DEV */
     LPTIMER_CLKEN();
     /* set lptmr's IRQ priority */
     NVIC_SetPriority(LPTIMER_IRQ_CHAN, LPTIMER_IRQ_PRIO);
