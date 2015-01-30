@@ -27,6 +27,7 @@
 
 #ifdef CPU_MODEL_KW22D512
 #include "MKW22D5.h"
+#include "mcg.h"
 #endif
 
 #ifdef __cplusplus
