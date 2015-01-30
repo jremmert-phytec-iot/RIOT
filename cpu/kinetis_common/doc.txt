@@ -191,7 +191,38 @@
 /**
  * @defgroup    cpu_kinetis_common_timer Kinetis Timer
  * @ingroup     cpu_kinetis_common
- * @brief       Timer driver (PIT).
+ * @brief       Periodic Interrupt Timer (PIT) driver.
+ *              Implementation of riot-os low level timer interface 
+ *              for the Kinetis Periodic Interrupt Timer.
+ *              The PIT is a count down timer, in order to use it with riot-os
+ *              a count up timer will be simulated. The PIT has four channels,
+ *              each two channels are cascaded. The n-1 channel is a prescaler
+ *              and the n channel a down counter. In standard configuration
+ *              with four channels, two simulated count up timer are possible.
+ *
+ *              ### Timer configuration Example (for periph_conf.h) ###
+ *
+ *                  #define TIMER_NUMOF             (1U)
+ *                  #define TIMER_0_EN              1
+ *                  #define TIMER_1_EN              0
+ *                  #define TIMER_IRQ_PRIO          1
+ *                  #define TIMER_DEV               PIT
+ *                  #define TIMER_MAX_VALUE         (0xffffffff)
+ *                  #define TIMER_CLOCK             CLOCK_CORECLOCK
+ *                  #define TIMER_CLKEN()           (SIM->SCGC6 |= (SIM_SCGC6_PIT_MASK))
+ *                  
+ *                  // Timer 0 configuration 
+ *                  #define TIMER_0_PRESCALER_CH    0
+ *                  #define TIMER_0_COUNTER_CH      1
+ *                  #define TIMER_0_ISR             isr_pit1
+ *                  #define TIMER_0_IRQ_CHAN        PIT1_IRQn
+ *
+ *                  // Timer 1 configuration
+ *                  #define TIMER_1_PRESCALER_CH    2
+ *                  #define TIMER_1_COUNTER_CH      3
+ *                  #define TIMER_1_ISR             isr_pit3
+ *                  #define TIMER_1_IRQ_CHAN        PIT3_IRQn
+ *
  */
 
 /**
