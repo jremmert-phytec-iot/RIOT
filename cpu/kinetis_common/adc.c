@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 Freie Universität Berlin
  * Copyright (C) 2014 PHYTEC Messtechnik GmbH
+ * Copyright (C) 2015 Eistec AB
  *
  * This file is subject to the terms and conditions of the GNU Lesser General
  * Public License v2.1. See the file LICENSE in the top level directory for more
@@ -17,6 +18,7 @@
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  * @author      Johann Fischer <j.fischer@phytec.de>
  * @author      Jonas Remmert <j.remmert@phytec.de>
+ * @author      Joakim Gebart <joakim.gebart@eistec.se>
  *
  * @}
  */
@@ -49,44 +51,47 @@ adc_config_t adc_config[ADC_NUMOF];
  */
 int kinetis_adc_calibrate(ADC_Type *ADC_ptr)
 {
-  uint16_t cal;
+    uint16_t cal;
 
-  ADC_ptr->SC3 |= ADC_SC3_CAL_MASK;
-  while(ADC_ptr->SC3 & ADC_SC3_CAL_MASK); /* wait for calibration to finish */
-  while(!(ADC_ptr->SC1[0] & ADC_SC1_COCO_MASK));
-  if(ADC_ptr->SC3 & ADC_SC3_CALF_MASK) {
-    /* calibration failed for some reason, possibly SC2[ADTRG] is 1 ? */
-    return -1;
-  }
+    ADC_ptr->SC3 |= ADC_SC3_CAL_MASK;
 
-  /*
-   * Following the steps in the reference manual:
-   */
-  /* 1. Initialize or clear a 16-bit variable in RAM. */
-  /* 2. Add the plus-side calibration results CLP0, CLP1, CLP2, CLP3, CLP4, and
-   * CLPS to the variable. */
-  cal = ADC_ptr->CLP0 + ADC_ptr->CLP1 + ADC_ptr->CLP2 + ADC_ptr->CLP3 +
-    ADC_ptr->CLP4 + ADC_ptr->CLPS;
-  /* 3. Divide the variable by two. */
-  cal /= 2;
-  /* 4. Set the MSB of the variable. */
-  cal |= (1 << 15);
-  /* (5. The previous two steps can be achieved by setting the carry bit,
-   * rotating to the right through the carry bit on the high byte and again on
-   * the low byte.)
-   * We ignore the above optimization suggestion, we most likely only perform
-   * this calibration on startup and it will only save nanoseconds. */
-  /* 6. Store the value in the plus-side gain calibration register PG. */
-  ADC_ptr->PG = cal;
+    while (ADC_ptr->SC3 & ADC_SC3_CAL_MASK); /* wait for calibration to finish */
 
-  /* 7. Repeat the procedure for the minus-side gain calibration value. */
-  cal = ADC_ptr->CLM0 + ADC_ptr->CLM1 + ADC_ptr->CLM2 + ADC_ptr->CLM3 +
-    ADC_ptr->CLM4 + ADC_ptr->CLMS;
-  cal /= 2;
-  cal |= (1 << 15);
-  ADC_ptr->MG = cal;
+    while (!(ADC_ptr->SC1[0] & ADC_SC1_COCO_MASK));
 
-  return 0;
+    if (ADC_ptr->SC3 & ADC_SC3_CALF_MASK) {
+        /* calibration failed for some reason, possibly SC2[ADTRG] is 1 ? */
+        return -1;
+    }
+
+    /*
+     * Following the steps in the reference manual:
+     */
+    /* 1. Initialize or clear a 16-bit variable in RAM. */
+    /* 2. Add the plus-side calibration results CLP0, CLP1, CLP2, CLP3, CLP4, and
+     * CLPS to the variable. */
+    cal = ADC_ptr->CLP0 + ADC_ptr->CLP1 + ADC_ptr->CLP2 + ADC_ptr->CLP3 +
+          ADC_ptr->CLP4 + ADC_ptr->CLPS;
+    /* 3. Divide the variable by two. */
+    cal /= 2;
+    /* 4. Set the MSB of the variable. */
+    cal |= (1 << 15);
+    /* (5. The previous two steps can be achieved by setting the carry bit,
+     * rotating to the right through the carry bit on the high byte and again on
+     * the low byte.)
+     * We ignore the above optimization suggestion, we most likely only perform
+     * this calibration on startup and it will only save nanoseconds. */
+    /* 6. Store the value in the plus-side gain calibration register PG. */
+    ADC_ptr->PG = cal;
+
+    /* 7. Repeat the procedure for the minus-side gain calibration value. */
+    cal = ADC_ptr->CLM0 + ADC_ptr->CLM1 + ADC_ptr->CLM2 + ADC_ptr->CLM3 +
+          ADC_ptr->CLM4 + ADC_ptr->CLMS;
+    cal /= 2;
+    cal |= (1 << 15);
+    ADC_ptr->MG = cal;
+
+    return 0;
 }
 
 
@@ -202,6 +207,7 @@ int adc_init(adc_t dev, adc_precision_t precision)
             adc_config[dev].bits = 16;
             break;
     }
+
     adc_config[dev].max_value = (1 << adc_config[dev].bits);
 
     for (i = 0; i < channels; i++) {
@@ -218,22 +224,27 @@ int adc_init(adc_t dev, adc_precision_t precision)
         /* Need to divide by 16, we set the clock input to BusClock/2 and
          * divide clock by 8 (the maximum divider) */
         div = ADC_CFG1_ADIV(3) | ADC_CFG1_ADICLK(1);
-    } else if (clock > 4000000 * 4) {
+    }
+    else if (clock > 4000000 * 4) {
         /* divide clock by 8 */
         div = ADC_CFG1_ADIV(3);
-    } else if (clock > 4000000 * 2) {
+    }
+    else if (clock > 4000000 * 2) {
         /* divide clock by 4 */
         div = ADC_CFG1_ADIV(2);
-    } else if (clock > 4000000 * 1) {
+    }
+    else if (clock > 4000000 * 1) {
         /* divide clock by 2 */
         div = ADC_CFG1_ADIV(1);
-    } else {
+    }
+    else {
         /* no clock divider */
         div = ADC_CFG1_ADIV(0);
     }
+
     /* set configuration register 1: clocking and precision */
     /* Set long sample time */
-    adc->CFG1 = ADC_CFG1_ADLSMP_MASK | mode | clock;
+    adc->CFG1 = ADC_CFG1_ADLSMP_MASK | mode | clock | div;
 
     /* select ADxxb channels, longest sample time (20 extra ADC cycles) */
     adc->CFG2 = ADC_CFG2_MUXSEL_MASK | ADC_CFG2_ADLSTS(0);
@@ -384,6 +395,7 @@ void adc_poweroff(adc_t dev)
 int adc_map(adc_t dev, int value, int min, int max)
 {
     int scale = max - min;
+
     /* NB: There is additional room for the multiplication result if using the
      * actual precision setting of the ADC as the limit in this if statement: */
     if (scale < (1 << 16)) {
@@ -393,7 +405,8 @@ int adc_map(adc_t dev, int value, int min, int max)
         int32_t tmp = value * scale;
         /* Divide by ADC range to get the scaled result */
         return (tmp / (1 << adc_config[dev].bits));
-    } else {
+    }
+    else {
         /* Target scale is too large to use int32_t as an in between result */
         int64_t tmp = scale;
         /* Make sure the compiler does not generate code which will truncate the
