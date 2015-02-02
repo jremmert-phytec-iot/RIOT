@@ -126,6 +126,7 @@ extern "C"
 
 /* ADC 0 configuration */
 #define ADC_0_DEV           ADC0
+#define ADC_0_MODULE_CLOCK  CLOCK_CORECLOCK
 #define ADC_0_CHANNELS      6
 #define ADC_0_CLKEN()       (SIM->SCGC6 |= (SIM_SCGC6_ADC0_MASK))
 #define ADC_0_CLKDIS()      (SIM->SCGC6 &= ~(SIM_SCGC6_ADC0_MASK))
