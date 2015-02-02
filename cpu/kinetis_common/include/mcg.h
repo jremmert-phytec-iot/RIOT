@@ -121,8 +121,6 @@ typedef enum kinetis_mcg_mode {
     KINETIS_MCG_FEI,     /**< FLL Engaged Internal Mode */
 } kinetis_mcg_mode_t;
 
-uint32_t cpufreq;
-
 /**
  * @brief Initialize the MCG
  *

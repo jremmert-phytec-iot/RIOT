@@ -353,7 +353,6 @@ static void kinetis_mcg_set_pee(void)
     while ((MCG->S & MCG_S_CLKST_MASK) != MCG_S_CLKST(3));
 
     current_mode = KINETIS_MCG_PEE;
-    cpufreq = KINETIS_MCG_PLL_FREQ;
 }
 
 
