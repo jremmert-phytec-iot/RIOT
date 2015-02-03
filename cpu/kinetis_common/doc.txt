@@ -8,6 +8,25 @@
  * @defgroup    cpu_kinetis_common_adc Kinetis ADC
  * @ingroup     cpu_kinetis_common
  * @brief       ADC driver.
+ *
+ *              ### ADC Configuration Example (for periph_conf.h) ###
+ *
+ *                  #define ADC_NUMOF           (1U)
+ *                  #define ADC_0_EN            1
+ *                  #define ADC_MAX_CHANNELS    1
+ *                  
+ *                  // ADC 0 configuration
+ *                  #define ADC_0_DEV           ADC0
+ *                  #define ADC_0_MODULE_CLOCK  CLOCK_CORECLOCK
+ *                  #define ADC_0_CHANNELS      1
+ *                  #define ADC_0_CLKEN()       (SIM->SCGC6 |= (SIM_SCGC6_ADC0_MASK))
+ *                  #define ADC_0_CLKDIS()      (SIM->SCGC6 &= ~(SIM_SCGC6_ADC0_MASK))
+ *                  #define ADC_0_PORT_CLKEN()  (SIM->SCGC5 |= (SIM_SCGC5_PORTE_MASK))
+ *                  
+ *                  #define ADC_0_CH5           11
+ *                  #define ADC_0_CH5_PIN       1
+ *                  #define ADC_0_CH5_PIN_AF    0
+ *                  #define ADC_0_CH5_PORT      PORTE
  */
 
 /**
