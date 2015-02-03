@@ -244,7 +244,7 @@ int adc_init(adc_t dev, adc_precision_t precision)
 
     /* set configuration register 1: clocking and precision */
     /* Set long sample time */
-    adc->CFG1 = ADC_CFG1_ADLSMP_MASK | mode | clock | div;
+    adc->CFG1 = ADC_CFG1_ADLSMP_MASK | mode | div;
 
     /* select ADxxb channels, longest sample time (20 extra ADC cycles) */
     adc->CFG2 = ADC_CFG2_MUXSEL_MASK | ADC_CFG2_ADLSTS(0);
