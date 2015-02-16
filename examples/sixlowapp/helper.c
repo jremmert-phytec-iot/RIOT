@@ -26,8 +26,7 @@ void sixlowapp_ndp_workaround(ipv6_addr_t *dest)
     /* add the destination to the neighbor cache if is not already in it */
     if (!ndp_neighbor_cache_search(dest)) {
         DEBUGF("XXX: Adding %s to neighbor cache.\n", ipv6_addr_to_str(addr_str, IPV6_MAX_ADDR_STR_LEN, dest));
-        //ndp_neighbor_cache_add(IF_ID, dest, &(dest->uint16[7]), 2, 0,
-        ndp_neighbor_cache_add(IF_ID, dest, &(dest->uint16[6]), 4, 0,
+        ndp_neighbor_cache_add(IF_ID, dest, &(dest->uint16[7]), 2, 0,
                                NDP_NCE_STATUS_REACHABLE,
                                NDP_NCE_TYPE_TENTATIVE, 0xffff);
     }

@@ -41,7 +41,6 @@ int main(void)
 {
     puts("RIOT 6LoWPAN example v"APP_VERSION);
 
-    net_if_set_src_address_mode(IF_ID, NET_IF_TRANS_ADDR_M_LONG);
     sixlowpan_lowpan_init_interface(IF_ID);
 
     /* start thread for monitor mode */
