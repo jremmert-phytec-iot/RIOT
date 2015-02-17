@@ -65,7 +65,7 @@ extern "C" {
 
 #define MKW2XDRF_BROADCAST_ADDRESS  (0xFFFF) /**< Broadcast address. */
 
-#define MKW2XDRF_DEFAULT_CHANNR     11       /**< Default radio channel. */
+#define MKW2XDRF_DEFAULT_CHANNR     13       /**< Default radio channel. */
 #define MKW2XDRF_DEFAULT_RADIO_PAN  0x0001   /**< Default radio pan ID */
 /**
  *  Structure to represent a kw2xrf packet.
