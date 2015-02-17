@@ -65,6 +65,8 @@ static uint8_t ipv6_net_if_addr_buffer_count = 0;
 
 static uint8_t default_hop_limit = MULTIHOP_HOPLIMIT;
 
+extern kernel_pid_t hack_msg_pid;
+
 /* registered upper layer threads */
 kernel_pid_t sixlowip_reg[SIXLOWIP_MAX_REGISTERED];
 
@@ -375,6 +377,8 @@ static int is_our_address(ipv6_addr_t *addr)
     return -1;
 }
 
+char hack_msgbuffer[] = {"1234567890123456789012345678901234567890"};
+
 void *ipv6_process(void *arg)
 {
     (void) arg;
@@ -413,6 +417,19 @@ void *ipv6_process(void *arg)
         }
         /* destination is our address */
         else if (addr_match) {
+
+		/* HACK */
+                msg_t my_m;
+		m_send.content.ptr = (char *) ipv6_buf;
+		uint8_t *payload = ((uint8_t *)(m_send.content.ptr + IPV6_HDR_LEN));
+		snprintf(hack_msgbuffer, 40, "%s\n", payload);
+		//printf("%s\n", hack_msgbuffer);
+		ipv6_buf = NULL;
+
+		my_m.content.ptr = (char *) &hack_msgbuffer;
+		my_m.type = 1;
+		msg_send(&my_m, hack_msg_pid);
+
             switch (*nextheader) {
                 case (IPV6_PROTO_NUM_ICMPV6): {
                     icmp_buf = get_icmpv6_buf(ipv6_ext_hdr_len);

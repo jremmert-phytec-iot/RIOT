@@ -25,6 +25,14 @@ USEMODULE += uart0
 USEMODULE += ps
 USEMODULE += defaulttransceiver
 USEMODULE += udp
+
+USEMODULE += vtimer
+USEMODULE += hdc1000
+USEMODULE += tmp006
+USEMODULE += mpl3115a2
+USEMODULE += mag3110
+USEMODULE += mma8652
+
 ifneq (,$(filter iot-lab_M3,$(BOARD)))
 	USEMODULE += isl29020
 	USEMODULE += lps331ap
