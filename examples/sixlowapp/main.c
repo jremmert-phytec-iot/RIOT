@@ -81,6 +81,9 @@ void sensors_init(void)
 
     if (tmp006_init(&tmp006_dev, I2C_0, 0x41, TMP006_CONFIG_CR_DEF) == 0) {
         sensor_stat |= SENSOR_ENABLED_TMP006;
+        if (tmp006_set_active(&tmp006_dev)) {
+            sensor_stat &= ~SENSOR_ENABLED_TMP006;
+        }
     }
 
     if (mpl3115a2_init(&mpl3115a2_dev, I2C_0, 0x60, MPL3115A2_OS_RATIO_DEFAULT) == 0) {
