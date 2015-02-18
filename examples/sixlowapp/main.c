@@ -119,6 +119,14 @@ static void *sensor_server(void *arg)
 
     timex_t sleep = timex_set(1, 0);
 
+    LED_G_ON;
+    LED_B_ON;
+    LED_R_ON;
+    vtimer_usleep(100000);
+    LED_G_OFF;
+    LED_B_OFF;
+    LED_R_OFF;
+
     while (1) {
         if (sensor_stat & SENSOR_ENABLED_HDC1000) {
             uint16_t rawtemp, rawhum;
@@ -167,7 +175,7 @@ static void *hack_msg_server(void *arg)
     (void) arg;
     msg_t m;
     char tx[32] = "supe\0";
-    char *arg_nc[] = { "nc", "ff02::1", "5000", "test"};
+    char *arg_nc[] = { "nc", "ff02::1", "23025", "test"};
     unsigned int argc_nc = 4;
     unsigned int argc_msg = 3;
     char *rx;
