@@ -176,15 +176,36 @@ static void *hack_msg_server(void *arg)
 	rx = (char *) m.content.ptr;
 
 	if (strstr(rx, "get:hdc1000") != NULL) {
-            snprintf(tx, sizeof(tx), "temp:%d,rh:%d\n", temp, hum);
+            snprintf(tx, sizeof(tx)-1, "temp:%d,rh:%d\n", temp, hum);
         } else if (strstr(rx, "get:mpl3115a2") != NULL) {
-            snprintf(tx, sizeof(tx), "pressure:%d\n", (unsigned int)pressure);
+            snprintf(tx, sizeof(tx)-1, "pressure:%d\n", (unsigned int)pressure);
         } else if (strstr(rx, "get:mma8652") != NULL) {
-            snprintf(tx, sizeof(tx), "x:%d,y:%d,z:%d\n", a_x, a_y, a_z);
+            snprintf(tx, sizeof(tx)-1, "x:%d,y:%d,z:%d\n", a_x, a_y, a_z);
         } else if (strstr(rx, "get:mag3110") != NULL) {
-            snprintf(tx, sizeof(tx), "x:%d,y:%d,z:%d\n", m_x, m_y, m_z);
+            snprintf(tx, sizeof(tx)-1, "x:%d,y:%d,z:%d\n", m_x, m_y, m_z);
         } else if (strstr(rx, "get:tmp006") != NULL) {
-            snprintf(tx, sizeof(tx), "tamb:%d,tobj:%d\n", (int)(tamb*100), (int)(tobj*100));
+            snprintf(tx, sizeof(tx)-1, "tamb:%d,tobj:%d\n", (int)(tamb*100), (int)(tobj*100));
+        } else if (strstr(rx, "set:rled,val:0") != NULL ||
+			(strstr(rx, "set:rled,val:00") != NULL)) {
+		LED_R_OFF;
+		snprintf(tx, sizeof(tx)-1, "LED_R_OFF\n");
+        } else if (strstr(rx, "set:rled,val:") != NULL) {
+		LED_R_ON;
+		snprintf(tx, sizeof(tx)-1, "LED_R_ON\n");
+        } else if (strstr(rx, "set:gled,val:0") != NULL ||
+			(strstr(rx, "set:gled,val:00") != NULL)) {
+		LED_G_OFF;
+		snprintf(tx, sizeof(tx)-1, "LED_G_OFF\n");
+        } else if (strstr(rx, "set:gled,val:") != NULL) {
+		LED_G_ON;
+		snprintf(tx, sizeof(tx)-1, "LED_G_ON\n");
+        } else if (strstr(rx, "set:bled,val:0") != NULL ||
+			(strstr(rx, "set:bled,val:00") != NULL)) {
+		LED_B_OFF;
+		snprintf(tx, sizeof(tx)-1, "LED_B_OFF\n");
+        } else if (strstr(rx, "set:bled,val:") != NULL) {
+		LED_B_ON;
+		snprintf(tx, sizeof(tx)-1, "LED_B_ON\n");
         } else {
             continue;
         }
