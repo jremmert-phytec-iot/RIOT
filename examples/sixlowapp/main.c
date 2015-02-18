@@ -90,7 +90,7 @@ void sensors_init(void)
         }
     }
 
-    if (mag3110_init(&mag3110_dev, I2C_0, 0x1e, MAG3110_DROS_DEFAULT) == 0) {
+    if (mag3110_init(&mag3110_dev, I2C_0, 0x0e, MAG3110_DROS_DEFAULT) == 0) {
         sensor_stat |= SENSOR_ENABLED_MAG3110;
         if (mag3110_set_active(&mag3110_dev)) {
             sensor_stat &= ~SENSOR_ENABLED_MAG3110;
