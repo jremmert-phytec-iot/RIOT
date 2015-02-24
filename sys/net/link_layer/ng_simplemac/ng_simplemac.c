@@ -42,14 +42,15 @@ typedef enum {
     CSMA_WAIT,
     CSMA_TX_FRAME,
     CSMA_WAIT_FOR_ACK
-} simplemac_states;
+} simplemac_states_t;
 
-static simplemac_states simplemac_state = CSMA_IDLE;
+static simplemac_states_t simplemac_state = CSMA_IDLE;
 static uint8_t be = 0;
 static uint8_t retries = 0;
-static int mac_tmr = MAC_TIMER;
+static tim_t mac_tmr = MAC_TIMER;
 static ng_netdev_t *simplemac_dev = NULL;
-static ng_pktsnip_t *simplemac_pkt = NULL;
+//static ng_pktsnip_t *simplemac_pkt = NULL;
+static msg_t msg;  
 
 /**
  * @brief   Function called by the device driver on device events
@@ -141,7 +142,7 @@ static int backoff_wait(uint8_t backoff_exponent)
  * @return number of bytes that were actually send out
  * @return -1 if packet could not sent out
  */
-static void _mac_send_statechart()
+static void _mac_send_statechart(int dummy)
 {
     ng_netapi_opt_t *conf;
     int res;
@@ -173,7 +174,7 @@ static void _mac_send_statechart()
                  * if CCA is ready.
                  */
                 res = simplemac_dev->driver->get(simplemac_dev,
-                                                 conf->opt, conf->data, &(conf->data_len));
+                                     conf->opt, conf->data, (size_t*)(&(conf->data_len)));
                 simplemac_state = CSMA_WAIT;
                 return;
                 break;
@@ -184,7 +185,7 @@ static void _mac_send_statechart()
                 /* It is not quite clear to me, in what way the get/set CCA Option should be
                  * implemented in the radio driver.
                  */
-                if (<CCA Successful>) {
+                if (1) {      //<CCA Successful>
                     /* As the radio triggers an interrupt when the CCA
                                              * interval is expired, ask via SPI weather CCA
                                              * was successfull or not. */
@@ -195,7 +196,7 @@ static void _mac_send_statechart()
                     be ++;
 
                     if (be > MAX_BE) { /* Signalize failure, but how? Static Variable? */
-                        simplemac_state CSMA_IDLE;
+                        simplemac_state = CSMA_IDLE;
                         return;
                     }
 
@@ -227,7 +228,7 @@ static void _mac_send_statechart()
                 /* TODO: Determine ISR source */
                 timer_clear(mac_tmr, MAC_TMR_CH);
 
-                if (<Timer Int>) {
+                if (1) {  // <Timer Interrupt>
                     simplemac_state = CSMA_IDLE;
                     /* Signalize success*/
                     return;
@@ -262,7 +263,7 @@ static void *_simplemac_thread(void *args)
     ng_netdev_t *simplemac_dev = (ng_netdev_t *)args;
     ng_netapi_opt_t *opt;
     int res;
-    msg_t msg, reply, msg_queue[NG_SIMPLEMAC_MSG_QUEUE_SIZE];
+    msg_t reply, msg_queue[NG_SIMPLEMAC_MSG_QUEUE_SIZE];
 
     /* TODO: Initialize Network device with the following options:
      * Enable Auto Ack:                        NETCONF_OPT_AUTOACK

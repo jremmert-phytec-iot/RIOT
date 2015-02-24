@@ -86,9 +86,13 @@ extern "C" {
 #define MAC_TIMER               TIMER_0
 
 /**
- * @brief   The Channel to use for timer in MAC-layer.
+ * @brief   The physical timer that is used for the MAC-layer, (periph/timer - IF).
  */
 #define MAC_TMR_CH              0
+
+/**
+ * @brief   The Channel to use for timer in MAC-layer.
+ */
 
 /**
  * @brief   Set the default message queue size for SIMPLEMAC layers
