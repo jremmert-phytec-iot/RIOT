@@ -47,7 +47,7 @@ typedef enum {
 static csma_mac_states_t csma_mac_state = CSMA_IDLE;
 static uint8_t be = 0;
 static uint8_t retries = 0;
-//static tim_t mac_tmr = MAC_TIMER;
+//static tim_t mac_tmr = CSMA_MAC_TIMER;
 static ng_netdev_t *csma_mac_dev = NULL;
 //static ng_pktsnip_t *csma_mac_pkt = NULL;
 static msg_t msg;  
@@ -104,15 +104,15 @@ static int backoff_wait(uint8_t backoff_exponent)
     uint16_t backoff_intervall = 0;
     char buf[2];
 
-    if (backoff_exponent < MAX_BE) {
-        backoff_exponent = MAX_BE;
+    if (backoff_exponent < CSMA_MAC_MAX_BE) {
+        backoff_exponent = CSMA_MAC_MAX_BE;
     }
 
-    /* backoff_intervall is defined as ((2^bf)-1)*SYMBOL_LENGTH */
+    /* backoff_intervall is defined as ((2^bf)-1)*CSMA_MAC_SYMBOL_LENGTH */
     backoff_intervall = 1;
     backoff_intervall <<= backoff_exponent;
     backoff_intervall--;
-    backoff_intervall *= SYMBOL_LENGTH;
+    backoff_intervall *= CSMA_MAC_SYMBOL_LENGTH;
     DEBUG("Upper limit for backoff_intervall: %i\n", backoff_intervall);
 
     /* Generate 16bit random number */
@@ -128,7 +128,7 @@ static int backoff_wait(uint8_t backoff_exponent)
     DEBUG("Random number generated: %i\n", random);
     DEBUG("Wait interval: %i\n", backoff_intervall);
 
-    //timer_set(mac_tmr, MAC_TMR_CH, backoff_intervall);
+    //timer_set(mac_tmr, CSMA_MAC_TIMER_CH, backoff_intervall);
     DEBUG("Timer set to %i\n", random);
     return 0;
 }
@@ -159,9 +159,9 @@ static void _mac_send_statechart(int dummy)
 
             case CSMA_PERFORM_CCA:
                 DEBUG("csma_mac-state: CSMA_PERFORM_CCA\n");
-                //timer_clear(mac_tmr, MAC_TMR_CH);
+                //timer_clear(mac_tmr, CSMA_MAC_TIMER_CH);
 
-                if (be > MAX_CSMA_BACKOFFS) {
+                if (be > CSMA_MAC_MAX_BACKOFFS) {
                     return;
                     csma_mac_state = CSMA_IDLE;
                 }
@@ -195,7 +195,7 @@ static void _mac_send_statechart(int dummy)
                     backoff_wait(be);
                     be ++;
 
-                    if (be > MAX_BE) { /* Signalize failure, but how? Static Variable? */
+                    if (be > CSMA_MAC_MAX_BE) { /* Signalize failure, but how? Static Variable? */
                         csma_mac_state = CSMA_IDLE;
                         return;
                     }
@@ -218,7 +218,7 @@ static void _mac_send_statechart(int dummy)
                     /* Signalize failure */
                 }
 
-                //timer_set(mac_tmr, MAC_TMR_CH, MAX_ACK_WAIT_DURATION);
+                //timer_set(mac_tmr, CSMA_MAC_TIMER_CH, CSMA_MAC_MAX_ACK_WAIT_DURATION);
                 csma_mac_state = CSMA_WAIT_FOR_ACK;
                 return;
                 break;
@@ -226,7 +226,7 @@ static void _mac_send_statechart(int dummy)
             case CSMA_WAIT_FOR_ACK:
                 DEBUG("csma_mac-state: CSMA_WAIT_FOR_ACK\n");
                 /* TODO: Determine ISR source */
-                //timer_clear(mac_tmr, MAC_TMR_CH);
+                //timer_clear(mac_tmr, CSMA_MAC_TIMER_CH);
 
                 if (1) {  // <Timer Interrupt>
                     csma_mac_state = CSMA_IDLE;
@@ -236,7 +236,7 @@ static void _mac_send_statechart(int dummy)
                 else {
                     retries ++;
 
-                    if (retries > MAX_FRAME_RETRIES) {
+                    if (retries > CSMA_MAC_MAX_FRAME_RETRIES) {
                         csma_mac_state = CSMA_PERFORM_CCA;
                     }
                     else {
@@ -263,7 +263,7 @@ static void *_csma_mac_thread(void *args)
     //ng_netdev_t *csma_mac_dev = (ng_netdev_t *)args;
     ng_netapi_opt_t *opt;
     int res;
-    msg_t reply, msg_queue[NG_CSMA_MAC_MSG_QUEUE_SIZE];
+    msg_t reply, msg_queue[CSMA_MAC_MSG_QUEUE_SIZE];
 
     /* TODO: Initialize Network device with the following options:
      * Enable Auto Ack:                        NETCONF_OPT_AUTOACK
@@ -273,7 +273,7 @@ static void *_csma_mac_thread(void *args)
      */
 
     /* setup the MAC layers message queue */
-    msg_init_queue(msg_queue, NG_CSMA_MAC_MSG_QUEUE_SIZE);
+    msg_init_queue(msg_queue, CSMA_MAC_MSG_QUEUE_SIZE);
     /* save the PID to the device descriptor and register the device */
     //csma_mac_dev->mac_pid = thread_getpid();
     //ng_netif_add(csma_mac_dev->mac_pid);
@@ -338,7 +338,7 @@ static void *_csma_mac_thread(void *args)
     return NULL;
 }
 
-kernel_pid_t ng_csma_mac_init(char *stack, int stacksize, char priority,
+kernel_pid_t csma_mac_init(char *stack, int stacksize, char priority,
                                const char *name, ng_netdev_t *dev)
 {
     //unsigned int us_per_tick = 1;

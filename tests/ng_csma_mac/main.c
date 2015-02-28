@@ -89,7 +89,7 @@ int main(void)
     msg.type = NG_NETAPI_MSG_TYPE_SND;
     //msg.content.
     
-    ng_csma_mac_pid = ng_csma_mac_init(unittests_csma_mac_stack,
+    ng_csma_mac_pid = csma_mac_init(unittests_csma_mac_stack,
                            UNITTESTS_CSMA_MAC_STACKSIZE,
                            PRIORITY_MAIN - 1, UNITTESTS_NOMAC_NAME,
                            dev); 

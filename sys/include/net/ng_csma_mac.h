@@ -38,25 +38,25 @@ extern "C" {
  *           will attempt before declaring a channel access failure.
  *           The IEEE 802.15.4 Standard allows values from 0-5.
  */
-#define MAX_CSMA_BACKOFFS       4
+#define CSMA_MAC_MAX_BACKOFFS       4
 
 /**
  * @brief    The maximum value of the backoff exponent BE.
  * @details  The IEEE 802.15.4 Standard allows values from 3-8.
  */
-#define MAX_BE                  4
+#define CSMA_MAC_MAX_BE                  4
 
 /**
  * @brief    The minimum value of the backoff exponent BE.
- * @details  The IEEE 802.15.4 Standard allows values from 0-MAX_BE.
+ * @details  The IEEE 802.15.4 Standard allows values from 0-CSMA_MAC_MAX_BE.
  */
-#define MIN_BE                  3
+#define CSMA_MAC_MIN_BE                  3
 
 /**
  * @brief    The maximum number of retries allowed after a transmission failure.
  * @details  The IEEE 802.15.4 Standard allows values from 0-7.
  */
-#define MAX_FRAME_RETRIES       3
+#define CSMA_MAC_MAX_FRAME_RETRIES       3
 
 /**
  * @brief    Max symbols to wait for ack (value 30 only for testing!!! calculate it!!).
@@ -66,29 +66,29 @@ extern "C" {
  *           the selected channel and channel page. The calculated value is the time to 
  *           commence transmitting the ACK plus the length of the ACK frame.
  */
-#define MAX_ACK_WAIT_DURATION   30
+#define CSMA_MAC_MAX_ACK_WAIT_DURATION   30
 
 /**
  * @brief   The number of symbols forming the basic time period
  *          used by the CSMA-CA algorithm. 
  */
-#define UNIT_BACKOFF_PERIOD     20
+#define CSMA_MAC_UNIT_BACKOFF_PERIOD     20
 
 /**
  * @brief   Length of a single simbol in us. (PHY dependant)  
  * @details Is calculated as follows: 
  */
-#define SYMBOL_LENGTH           16
+#define CSMA_MAC_SYMBOL_LENGTH           16
 
 /**
  * @brief   The physical timer that is used for the MAC-layer, (periph/timer - IF).
  */
-#define MAC_TIMER               TIMER_0
+#define CSMA_MAC_TIMER               TIMER_0
 
 /**
  * @brief   The physical timer that is used for the MAC-layer, (periph/timer - IF).
  */
-#define MAC_TMR_CH              0
+#define CSMA_MAC_TIMER_CH              0
 
 /**
  * @brief   The Channel to use for timer in MAC-layer.
@@ -97,8 +97,8 @@ extern "C" {
 /**
  * @brief   Set the default message queue size for CSMA_MAC layers
  */
-#ifndef NG_CSMA_MAC_MSG_QUEUE_SIZE
-#define NG_CSMA_MAC_MSG_QUEUE_SIZE         (8U)
+#ifndef CSMA_MAC_MSG_QUEUE_SIZE
+#define CSMA_MAC_MSG_QUEUE_SIZE         (8U)
 #endif
 
 /**
@@ -117,7 +117,7 @@ extern "C" {
  * @return                  -EINVAL if creation of thread fails
  * @return                  -ENODEV if *dev* is invalid
  */
-kernel_pid_t ng_csma_mac_init(char *stack, int stacksize, char priority,
+kernel_pid_t csma_mac_init(char *stack, int stacksize, char priority,
                         const char *name, ng_netdev_t *dev);
 
 #ifdef __cplusplus
