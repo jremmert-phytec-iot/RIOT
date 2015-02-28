@@ -9,9 +9,9 @@
 
 /**
  * @{
- * @ingroup     net_simplemac
+ * @ingroup     net_csma_mac
  * @file
- * @brief       Implementation of the SIMPLEMAC MAC protocol
+ * @brief       Implementation of the CSMA_MAC MAC protocol
  *
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  * @author      Jonas Remmert <j.remmert@phytec.de>
@@ -31,9 +31,9 @@
 #include "net/ng_netif.h"
 #include "periph/timer.h"
 #include "periph/random.h"
-#include "net/ng_simplemac.h"
+#include "net/ng_csma_mac.h"
 
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG    (1)
 #include "debug.h"
 
 typedef enum {
@@ -42,14 +42,14 @@ typedef enum {
     CSMA_WAIT,
     CSMA_TX_FRAME,
     CSMA_WAIT_FOR_ACK
-} simplemac_states_t;
+} csma_mac_states_t;
 
-static simplemac_states_t simplemac_state = CSMA_IDLE;
+static csma_mac_states_t csma_mac_state = CSMA_IDLE;
 static uint8_t be = 0;
 static uint8_t retries = 0;
-static tim_t mac_tmr = MAC_TIMER;
-static ng_netdev_t *simplemac_dev = NULL;
-//static ng_pktsnip_t *simplemac_pkt = NULL;
+//static tim_t mac_tmr = MAC_TIMER;
+static ng_netdev_t *csma_mac_dev = NULL;
+//static ng_pktsnip_t *csma_mac_pkt = NULL;
 static msg_t msg;  
 
 /**
@@ -60,9 +60,9 @@ static msg_t msg;
  */
 static void _event_cb(ng_netdev_event_t event, void *data)
 {
-    DEBUG("simplemac: event triggered -> %i\n", event);
+    DEBUG("csma_mac: event triggered -> %i\n", event);
 
-    /* SIMPLEMAC only understands the RX_COMPLETE event... */
+    /* CSMA_MAC only understands the RX_COMPLETE event... */
     if (event == NETDEV_EVENT_RX_COMPLETE) {
         ng_pktsnip_t *pkt;
         ng_netreg_entry_t *sendto;
@@ -75,7 +75,7 @@ static void _event_cb(ng_netdev_event_t event, void *data)
 #if ENABLE_DEBUG
 
         if (sendto == NULL) {
-            DEBUG("simplemac: unable to forward packet of type %i\n",
+            DEBUG("csma_mac: unable to forward packet of type %i\n",
                   pkt->next->type);
         }
 
@@ -83,7 +83,7 @@ static void _event_cb(ng_netdev_event_t event, void *data)
 
         /* send the packet to everyone interested in it's type */
         while (sendto != NULL) {
-            DEBUG("simplemac: sending pkt %p to PID %u\n", pkt, sendto->pid);
+            DEBUG("csma_mac: sending pkt %p to PID %u\n", pkt, sendto->pid);
             ng_netapi_send(sendto->pid, pkt);
             sendto = ng_netreg_getnext(sendto);
         }
@@ -113,7 +113,7 @@ static int backoff_wait(uint8_t backoff_exponent)
     backoff_intervall <<= backoff_exponent;
     backoff_intervall--;
     backoff_intervall *= SYMBOL_LENGTH;
-    DEBUG("upper limit for backoff_intervall: %i\n", backoff_intervall);
+    DEBUG("Upper limit for backoff_intervall: %i\n", backoff_intervall);
 
     /* Generate 16bit random number */
     if (random_read(buf, 2) != 2) {
@@ -128,8 +128,8 @@ static int backoff_wait(uint8_t backoff_exponent)
     DEBUG("Random number generated: %i\n", random);
     DEBUG("Wait interval: %i\n", backoff_intervall);
 
-    timer_set(mac_tmr, MAC_TMR_CH, backoff_intervall);
-    DEBUG("timer set to %i\n", random);
+    //timer_set(mac_tmr, MAC_TMR_CH, backoff_intervall);
+    DEBUG("Timer set to %i\n", random);
     return 0;
 }
 
@@ -144,26 +144,26 @@ static int backoff_wait(uint8_t backoff_exponent)
  */
 static void _mac_send_statechart(int dummy)
 {
-    ng_netapi_opt_t *conf;
+    ng_netapi_opt_t *conf = NULL;
     int res;
 
     while (1) {
-        switch (simplemac_state) {
+        switch (csma_mac_state) {
 
             case CSMA_IDLE:
-                DEBUG("simplemac-state: CSMA_IDLE");
+                DEBUG("csma_mac-state: CSMA_IDLE\n");
                 be = 0;
                 retries = 0;
-                simplemac_state = CSMA_PERFORM_CCA;
+                csma_mac_state = CSMA_PERFORM_CCA;
                 break;
 
             case CSMA_PERFORM_CCA:
-                DEBUG("simplemac-state: CSMA_PERFORM_CCA");
-                timer_clear(mac_tmr, MAC_TMR_CH);
+                DEBUG("csma_mac-state: CSMA_PERFORM_CCA\n");
+                //timer_clear(mac_tmr, MAC_TMR_CH);
 
                 if (be > MAX_CSMA_BACKOFFS) {
                     return;
-                    simplemac_state = CSMA_IDLE;
+                    csma_mac_state = CSMA_IDLE;
                 }
 
                 conf -> opt = NETCONF_OPT_IS_CHANNEL_CLR;
@@ -173,14 +173,14 @@ static void _mac_send_statechart(int dummy)
                  * Poke CCA on radio driver, driver should trigger an interrupt
                  * if CCA is ready.
                  */
-                res = simplemac_dev->driver->get(simplemac_dev,
+                res = csma_mac_dev->driver->get(csma_mac_dev,
                                      conf->opt, conf->data, (size_t*)(&(conf->data_len)));
-                simplemac_state = CSMA_WAIT;
+                csma_mac_state = CSMA_WAIT;
                 return;
                 break;
 
             case CSMA_WAIT:
-                DEBUG("simplemac-state: CSMA_WAIT");
+                DEBUG("csma_mac-state: CSMA_WAIT\n");
 
                 /* It is not quite clear to me, in what way the get/set CCA Option should be
                  * implemented in the radio driver.
@@ -189,28 +189,28 @@ static void _mac_send_statechart(int dummy)
                     /* As the radio triggers an interrupt when the CCA
                                              * interval is expired, ask via SPI weather CCA
                                              * was successfull or not. */
-                    simplemac_state = CSMA_TX_FRAME;
+                    csma_mac_state = CSMA_TX_FRAME;
                 }
                 else {
                     backoff_wait(be);
                     be ++;
 
                     if (be > MAX_BE) { /* Signalize failure, but how? Static Variable? */
-                        simplemac_state = CSMA_IDLE;
+                        csma_mac_state = CSMA_IDLE;
                         return;
                     }
 
-                    simplemac_state = CSMA_PERFORM_CCA;
+                    csma_mac_state = CSMA_PERFORM_CCA;
                     return;
                 }
 
                 break;
 
             case CSMA_TX_FRAME:
-                DEBUG("simplemac-state: CSMA_TX_FRAME");
+                DEBUG("csma_mac-state: CSMA_TX_FRAME\n");
                 /* If ack was not successfull after this timer expires,
                  * mark as CHANNEL_ACCESS_FAILURE */
-                res = simplemac_dev->driver->send_data(simplemac_dev,
+                res = csma_mac_dev->driver->send_data(csma_mac_dev,
                                                        (ng_pktsnip_t *)msg.content.ptr);
 
                 if (res < 1) {
@@ -218,18 +218,18 @@ static void _mac_send_statechart(int dummy)
                     /* Signalize failure */
                 }
 
-                timer_set(mac_tmr, MAC_TMR_CH, MAX_ACK_WAIT_DURATION);
-                simplemac_state = CSMA_WAIT_FOR_ACK;
+                //timer_set(mac_tmr, MAC_TMR_CH, MAX_ACK_WAIT_DURATION);
+                csma_mac_state = CSMA_WAIT_FOR_ACK;
                 return;
                 break;
 
             case CSMA_WAIT_FOR_ACK:
-                DEBUG("simplemac-state: CSMA_WAIT_FOR_ACK");
+                DEBUG("csma_mac-state: CSMA_WAIT_FOR_ACK\n");
                 /* TODO: Determine ISR source */
-                timer_clear(mac_tmr, MAC_TMR_CH);
+                //timer_clear(mac_tmr, MAC_TMR_CH);
 
                 if (1) {  // <Timer Interrupt>
-                    simplemac_state = CSMA_IDLE;
+                    csma_mac_state = CSMA_IDLE;
                     /* Signalize success*/
                     return;
                 }
@@ -237,10 +237,10 @@ static void _mac_send_statechart(int dummy)
                     retries ++;
 
                     if (retries > MAX_FRAME_RETRIES) {
-                        simplemac_state = CSMA_PERFORM_CCA;
+                        csma_mac_state = CSMA_PERFORM_CCA;
                     }
                     else {
-                        simplemac_state = CSMA_IDLE;
+                        csma_mac_state = CSMA_IDLE;
                         /* Signalize failure */
                         return;
                     }
@@ -252,18 +252,18 @@ static void _mac_send_statechart(int dummy)
 }
 
 /**
- * @brief   Startup code and event loop of the SIMPLEMAC layer
+ * @brief   Startup code and event loop of the CSMA_MAC layer
  *
  * @param[in] args          expects a pointer to the underlying netdev device
  *
  * @return                  never returns
  */
-static void *_simplemac_thread(void *args)
+static void *_csma_mac_thread(void *args)
 {
-    ng_netdev_t *simplemac_dev = (ng_netdev_t *)args;
+    //ng_netdev_t *csma_mac_dev = (ng_netdev_t *)args;
     ng_netapi_opt_t *opt;
     int res;
-    msg_t reply, msg_queue[NG_SIMPLEMAC_MSG_QUEUE_SIZE];
+    msg_t reply, msg_queue[NG_CSMA_MAC_MSG_QUEUE_SIZE];
 
     /* TODO: Initialize Network device with the following options:
      * Enable Auto Ack:                        NETCONF_OPT_AUTOACK
@@ -273,12 +273,12 @@ static void *_simplemac_thread(void *args)
      */
 
     /* setup the MAC layers message queue */
-    msg_init_queue(msg_queue, NG_SIMPLEMAC_MSG_QUEUE_SIZE);
+    msg_init_queue(msg_queue, NG_CSMA_MAC_MSG_QUEUE_SIZE);
     /* save the PID to the device descriptor and register the device */
-    simplemac_dev->mac_pid = thread_getpid();
-    ng_netif_add(simplemac_dev->mac_pid);
+    //csma_mac_dev->mac_pid = thread_getpid();
+    //ng_netif_add(csma_mac_dev->mac_pid);
     /* register the event callback with the device driver */
-    simplemac_dev->driver->add_event_callback(simplemac_dev, _event_cb);
+    //csma_mac_dev->driver->add_event_callback(csma_mac_dev, _event_cb);
 
     /* TODO: Ask device for certain HW-MAC Support and store config for statechart
      *       AUTOACK supported?;
@@ -288,29 +288,29 @@ static void *_simplemac_thread(void *args)
 
     /* start the event loop */
     while (1) {
-        DEBUG("simplemac: waiting for incoming messages\n");
+        DEBUG("csma_mac: waiting for incoming messages\n");
         msg_receive(&msg);
 
         /* dispatch NETDEV and NETAPI messages */
         switch (msg.type) {
             case NG_NETDEV_MSG_TYPE_EVENT:
-                DEBUG("simplemac: NG_NETDEV_MSG_TYPE_EVENT received\n");
-                simplemac_dev->driver->isr_event(simplemac_dev, msg.content.value);
+                DEBUG("csma_mac: NG_NETDEV_MSG_TYPE_EVENT received\n");
+                csma_mac_dev->driver->isr_event(csma_mac_dev, msg.content.value);
                 break;
 
             case NG_NETAPI_MSG_TYPE_SND:
-                DEBUG("simplemac: NG_NETAPI_MSG_TYPE_SND received\n");
+                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SND received\n");
                 _mac_send_statechart(0);
                 break;
 
             case NG_NETAPI_MSG_TYPE_SET:
                 /* TODO: filter out MAC layer options -> for now forward
                          everything to the device driver */
-                DEBUG("simplemac: NG_NETAPI_MSG_TYPE_SET received\n");
+                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SET received\n");
                 /* read incoming options */
                 opt = (ng_netapi_opt_t *)msg.content.ptr;
                 /* set option for device driver */
-                res = simplemac_dev->driver->set(simplemac_dev, opt->opt, opt->data, opt->data_len);
+                res = csma_mac_dev->driver->set(csma_mac_dev, opt->opt, opt->data, opt->data_len);
                 /* send reply to calling thread */
                 reply.type = NG_NETAPI_MSG_TYPE_ACK;
                 reply.content.value = (uint32_t)res;
@@ -320,11 +320,11 @@ static void *_simplemac_thread(void *args)
             case NG_NETAPI_MSG_TYPE_GET:
                 /* TODO: filter out MAC layer options -> for now forward
                          everything to the device driver */
-                DEBUG("simplemac: NG_NETAPI_MSG_TYPE_GET received\n");
+                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_GET received\n");
                 /* read incoming options */
                 opt = (ng_netapi_opt_t *)msg.content.ptr;
                 /* get option from device driver */
-                res = simplemac_dev->driver->get(simplemac_dev, opt->opt, opt->data,
+                res = csma_mac_dev->driver->get(csma_mac_dev, opt->opt, opt->data,
                                                  (size_t *)(&(opt->data_len)));
                 /* send reply to calling thread */
                 reply.type = NG_NETAPI_MSG_TYPE_ACK;
@@ -338,28 +338,29 @@ static void *_simplemac_thread(void *args)
     return NULL;
 }
 
-kernel_pid_t ng_simplemac_init(char *stack, int stacksize, char priority,
+kernel_pid_t ng_csma_mac_init(char *stack, int stacksize, char priority,
                                const char *name, ng_netdev_t *dev)
 {
-    unsigned int us_per_tick = 1;
+    //unsigned int us_per_tick = 1;
     kernel_pid_t res;
 
+    DEBUG("Timer and RNG successfull initialized.\n");
     /* check if given netdev device is defined */
-    if (dev == NULL) {
-        return -ENODEV;
-    }
+    //if (dev == NULL) {
+    //    return -ENODEV;
+    //}
 
-    /* create new SIMPLEMAC thread */
+    /* create new CSMA_MAC thread */
     res = thread_create(stack, stacksize, priority, CREATE_STACKTEST,
-                        _simplemac_thread, (void *)dev, name);
+                        _csma_mac_thread, (void *)dev, name);
 
-    if (res <= 0) {
-        return -EINVAL;
-    }
+    //if (res <= 0) {
+    //    return -EINVAL;
+    //}
 
     random_init();
     /* If timer event occures, _mac_send_statechart is called in ISR. */
-    timer_init(mac_tmr, us_per_tick, _mac_send_statechart);
+    //timer_init(mac_tmr, us_per_tick, _mac_send_statechart);
     DEBUG("Timer and RNG successfull initialized.\n");
     return res;
 }

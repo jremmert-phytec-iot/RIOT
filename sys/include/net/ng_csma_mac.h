@@ -8,20 +8,20 @@
  */
 
 /**
- * @defgroup    net_simplemac basic CSMA MAC layer
+ * @defgroup    net_csma_mac basic CSMA MAC layer
  * @ingroup     net
  * @brief       Basic CSMA MAC protocol that sends in unslotted CSMA Mode
  * @{
  *
  * @file
- * @brief       Interface definition for the SIMPLEMAC MAC layer
+ * @brief       Interface definition for the CSMA MAC layer
  *
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  * @author      Jonas Remmert <j.remmert@phytec.de>
  */
 
-#ifndef NG_SIMPLEMAC_H_
-#define NG_SIMPLEMAC_H_
+#ifndef NG_CSMA_MAC_H_
+#define NG_CSMA_MAC_H_
 
 #include "kernel.h"
 #include "net/ng_netdev.h"
@@ -95,34 +95,34 @@ extern "C" {
  */
 
 /**
- * @brief   Set the default message queue size for SIMPLEMAC layers
+ * @brief   Set the default message queue size for CSMA_MAC layers
  */
-#ifndef NG_SIMPLEMAC_MSG_QUEUE_SIZE
-#define NG_SIMPLEMAC_MSG_QUEUE_SIZE         (8U)
+#ifndef NG_CSMA_MAC_MSG_QUEUE_SIZE
+#define NG_CSMA_MAC_MSG_QUEUE_SIZE         (8U)
 #endif
 
 /**
- * @brief   Initialize an instance of the SIMPLEMAC layer
+ * @brief   Initialize an instance of the CSMA_MAC layer
  *
  * The initialization starts a new thread that connects to the given netdev
  * device and starts a link layer event loop.
  *
  * @param[in] stack         stack for the control thread
  * @param[in] stacksize     size of *stack*
- * @param[in] priority      priority for the thread housing the SIMPLEMAC instance
- * @param[in] name          name of the thread housing the SIMPLEMAC instance
+ * @param[in] priority      priority for the thread housing the CSMA_MAC instance
+ * @param[in] name          name of the thread housing the CSMA_MAC instance
  * @param[in] dev           netdev device, needs to be already initialized
  *
- * @return                  PID of SIMPLEMAC thread on success
+ * @return                  PID of CSMA_MAC thread on success
  * @return                  -EINVAL if creation of thread fails
  * @return                  -ENODEV if *dev* is invalid
  */
-kernel_pid_t ng_simplemac_init(char *stack, int stacksize, char priority,
+kernel_pid_t ng_csma_mac_init(char *stack, int stacksize, char priority,
                         const char *name, ng_netdev_t *dev);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __SIMPLEMAC_H_ */
+#endif /* __CSMA_MAC_H_ */
 /** @} */

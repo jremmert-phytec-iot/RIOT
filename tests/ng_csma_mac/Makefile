@@ -8,10 +8,10 @@ endif
 
 include ../Makefile.tests_common
 
-USEMODULE += defaulttransceiver
+//USEMODULE += defaulttransceiver
 USEMODULE += net_help
 USEMODULE += netdev_base
-USEMODULE += simplemac
+USEMODULE += ng_csma_mac
 
 DISABLE_MODULE += auto_init
 

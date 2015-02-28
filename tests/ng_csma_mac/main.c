@@ -30,23 +30,29 @@
 #include "net_help.h"
 #include "netdev/base.h"
 #include "netdev/default.h"
-#include "net/ng_simplemac.h"
+#include "net/ng_csma_mac.h"
+#include "net/ng_netapi.h"
 
+#define UNITTESTS_CSMA_MAC_STACKSIZE (KERNEL_CONF_STACKSIZE_DEFAULT)
+#define UNITTESTS_NOMAC_NAME        "unittests_csma_mac"
+
+static char unittests_csma_mac_stack[UNITTESTS_CSMA_MAC_STACKSIZE];
+static kernel_pid_t ng_csma_mac_pid = KERNEL_PID_UNDEF;
+static netdev_t *dev = NULL;
 
 #ifdef NETDEV_DEFAULT
 #define SHELL_BUFSIZE   (UART0_BUFSIZE)
 
-static netdev_t *dev = NULL;
 
 int main(void)
 {
 
     puts("\nRIOT netdev test");
 
-    if (dev == NULL) {
+    /*if (dev == NULL) {
         puts("Default device was NULL");
         return 1;
-    }
+    }*/
 
     printf("Initialized dev ");
 
@@ -75,9 +81,20 @@ int main(void)
 
 int main(void)
 {
-    puts("\nRIOT netdev test");
-    puts("Default netdev type and driver unknown!");
+    msg_t msg;
 
+    puts("\nRIOT netdev test");
+    puts("Starting csma_mac thread\n");
+    
+    msg.type = NG_NETAPI_MSG_TYPE_SND;
+    //msg.content.
+    
+    ng_csma_mac_pid = ng_csma_mac_init(unittests_csma_mac_stack,
+                           UNITTESTS_CSMA_MAC_STACKSIZE,
+                           PRIORITY_MAIN - 1, UNITTESTS_NOMAC_NAME,
+                           dev); 
+
+    msg_send(&msg, ng_csma_mac_pid);
     return 0;
 }
 
