@@ -32,6 +32,8 @@
 #include "periph/timer.h"
 #include "periph/random.h"
 #include "net/ng_csma_mac.h"
+#include "hwtimer.h"
+#include "mutex.h"
 
 #define ENABLE_DEBUG    (1)
 #include "debug.h"
@@ -51,6 +53,19 @@ static uint8_t retries = 0;
 static ng_netdev_t *csma_mac_dev = NULL;
 //static ng_pktsnip_t *csma_mac_pkt = NULL;
 static msg_t msg;  
+static mutex_t mutex = MUTEX_INIT;
+
+static void task_block(void){
+    mutex_lock(&mutex);
+
+    /* try to lock mutex again will cause the thread to go into
+     * STATUS_MUTEX_BLOCKED until task_release fires the releasemutex */
+    mutex_lock(&mutex);
+}
+
+static void task_release(void){
+    mutex_unlock(&mutex);
+}
 
 /**
  * @brief   Function called by the device driver on device events
@@ -62,10 +77,12 @@ static void _event_cb(ng_netdev_event_t event, void *data)
 {
     DEBUG("csma_mac: event triggered -> %i\n", event);
 
-    /* CSMA_MAC only understands the RX_COMPLETE event... */
-    if (event == NETDEV_EVENT_RX_COMPLETE) {
-        ng_pktsnip_t *pkt;
-        ng_netreg_entry_t *sendto;
+    ng_pktsnip_t *pkt;
+    ng_netreg_entry_t *sendto;
+    
+    switch (event) {
+    
+    case NETDEV_EVENT_RX_COMPLETE:
 
         /* get pointer to the received packet */
         pkt = (ng_pktsnip_t *)data;
@@ -87,7 +104,16 @@ static void _event_cb(ng_netdev_event_t event, void *data)
             ng_netapi_send(sendto->pid, pkt);
             sendto = ng_netreg_getnext(sendto);
         }
-    }
+        break;
+
+   case NETDEV_EVENT_TX_COMPLETE:
+        task_release();
+        break;
+    
+   default:
+        break;
+        }
+
 }
 
 /**
@@ -126,12 +152,13 @@ static int backoff_wait(uint8_t backoff_exponent)
 
     backoff_intervall = random % backoff_intervall;
     DEBUG("Random number generated: %i\n", random);
-    DEBUG("Wait interval: %i\n", backoff_intervall);
 
     //timer_set(mac_tmr, CSMA_MAC_TIMER_CH, backoff_intervall);
-    DEBUG("Timer set to %i\n", random);
+    DEBUG("Backoff wait %i\n", backoff_intervall);
+    hwtimer_wait(backoff_intervall);
     return 0;
 }
+
 
 /**
  * @brief     The mac_send_statechart function implements an statechart for better clarity
@@ -142,10 +169,12 @@ static int backoff_wait(uint8_t backoff_exponent)
  * @return number of bytes that were actually send out
  * @return -1 if packet could not sent out
  */
-static void _mac_send_statechart(int dummy)
+static int _mac_send_statechart(void)
 {
     ng_netapi_opt_t *conf = NULL;
-    int res;
+    int res = 0;
+    /* Calculate µs value to tick amount for setting up HW-timer */
+    unsigned long ticks = HWTIMER_TICKS(100000);
 
     while (1) {
         switch (csma_mac_state) {
@@ -154,6 +183,7 @@ static void _mac_send_statechart(int dummy)
                 DEBUG("csma_mac-state: CSMA_IDLE\n");
                 be = 0;
                 retries = 0;
+                hwtimer_wait(ticks);
                 csma_mac_state = CSMA_PERFORM_CCA;
                 break;
 
@@ -162,21 +192,24 @@ static void _mac_send_statechart(int dummy)
                 //timer_clear(mac_tmr, CSMA_MAC_TIMER_CH);
 
                 if (be > CSMA_MAC_MAX_BACKOFFS) {
-                    return;
+                    return -EBUSY;
                     csma_mac_state = CSMA_IDLE;
                 }
+                
+                hwtimer_wait(ticks);
+                DEBUG("wait_ended\n");
 
-                conf -> opt = NETCONF_OPT_IS_CHANNEL_CLR;
-                conf -> data = 0;
+                //conf -> opt = NETCONF_OPT_IS_CHANNEL_CLR;
+                //conf -> data = 0;
                 /* TODO: What has to be assigned to data? */
                 /* In my opinion the CCA-check must be interrupt driven by the radio.
                  * Poke CCA on radio driver, driver should trigger an interrupt
                  * if CCA is ready.
                  */
-                res = csma_mac_dev->driver->get(csma_mac_dev,
-                                     conf->opt, conf->data, (size_t*)(&(conf->data_len)));
+                /*res = csma_mac_dev->driver->get(csma_mac_dev,
+                                     conf->opt, conf->data, (size_t*)(&(conf->data_len)));*/
                 csma_mac_state = CSMA_WAIT;
-                return;
+                //return;
                 break;
 
             case CSMA_WAIT:
@@ -189,19 +222,21 @@ static void _mac_send_statechart(int dummy)
                     /* As the radio triggers an interrupt when the CCA
                                              * interval is expired, ask via SPI weather CCA
                                              * was successfull or not. */
+                    hwtimer_wait(ticks);
                     csma_mac_state = CSMA_TX_FRAME;
                 }
                 else {
                     backoff_wait(be);
                     be ++;
 
-                    if (be > CSMA_MAC_MAX_BE) { /* Signalize failure, but how? Static Variable? */
+                    if (be > CSMA_MAC_MAX_BE) {     /* return error code */
                         csma_mac_state = CSMA_IDLE;
-                        return;
+                        return -EBUSY;              /* Resource busy */
                     }
 
+                    hwtimer_wait(ticks);
+                    be++;
                     csma_mac_state = CSMA_PERFORM_CCA;
-                    return;
                 }
 
                 break;
@@ -210,28 +245,29 @@ static void _mac_send_statechart(int dummy)
                 DEBUG("csma_mac-state: CSMA_TX_FRAME\n");
                 /* If ack was not successfull after this timer expires,
                  * mark as CHANNEL_ACCESS_FAILURE */
-                res = csma_mac_dev->driver->send_data(csma_mac_dev,
-                                                       (ng_pktsnip_t *)msg.content.ptr);
+                //res = csma_mac_dev->driver->send_data(csma_mac_dev,
+                //                                       (ng_pktsnip_t *)msg.content.ptr);
 
                 if (res < 1) {
-                    return;
+                    return res;
                     /* Signalize failure */
                 }
 
                 //timer_set(mac_tmr, CSMA_MAC_TIMER_CH, CSMA_MAC_MAX_ACK_WAIT_DURATION);
+                hwtimer_wait(ticks);
                 csma_mac_state = CSMA_WAIT_FOR_ACK;
-                return;
                 break;
 
             case CSMA_WAIT_FOR_ACK:
                 DEBUG("csma_mac-state: CSMA_WAIT_FOR_ACK\n");
                 /* TODO: Determine ISR source */
                 //timer_clear(mac_tmr, CSMA_MAC_TIMER_CH);
+                hwtimer_wait(ticks);
 
                 if (1) {  // <Timer Interrupt>
                     csma_mac_state = CSMA_IDLE;
-                    /* Signalize success*/
-                    return;
+                    /* Signalize success and return positive number of sent bytes*/
+                    return res;
                 }
                 else {
                     retries ++;
@@ -241,8 +277,7 @@ static void _mac_send_statechart(int dummy)
                     }
                     else {
                         csma_mac_state = CSMA_IDLE;
-                        /* Signalize failure */
-                        return;
+                        return -EBUSY;                  /* Resource busy */
                     }
                 }
 
@@ -299,8 +334,9 @@ static void *_csma_mac_thread(void *args)
                 break;
 
             case NG_NETAPI_MSG_TYPE_SND:
-                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SND received\n");
-                _mac_send_statechart(0);
+                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SND received, content.value = %i\n", 
+                            (int)msg.content.value);
+                _mac_send_statechart();
                 break;
 
             case NG_NETAPI_MSG_TYPE_SET:
