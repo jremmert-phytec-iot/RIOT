@@ -34,6 +34,7 @@
 #include "net/ng_csma_mac.h"
 #include "hwtimer.h"
 #include "mutex.h"
+#include "ng_kw2xrf.h"
 
 #define ENABLE_DEBUG    (1)
 #include "debug.h"
@@ -50,9 +51,13 @@ static csma_mac_states_t csma_mac_state = CSMA_IDLE;
 static uint8_t be = 0;
 static uint8_t retries = 0;
 //static tim_t mac_tmr = CSMA_MAC_TIMER;
-static ng_netdev_t *csma_mac_dev = NULL;
-//static ng_pktsnip_t *csma_mac_pkt = NULL;
-static msg_t msg;  
+
+static ng_netdev_t index_csma_mac_dev;
+static ng_netdev_t *csma_mac_dev = &index_csma_mac_dev;
+
+static ng_pktsnip_t index_csma_mac_pkt;
+static ng_pktsnip_t *csma_mac_pkt = &index_csma_mac_pkt;
+static msg_t msg;
 static mutex_t mutex = MUTEX_INIT;
 
 static void task_block(void){
@@ -79,9 +84,9 @@ static void _event_cb(ng_netdev_event_t event, void *data)
 
     ng_pktsnip_t *pkt;
     ng_netreg_entry_t *sendto;
-    
+
     switch (event) {
-    
+
     case NETDEV_EVENT_RX_COMPLETE:
 
         /* get pointer to the received packet */
@@ -109,7 +114,7 @@ static void _event_cb(ng_netdev_event_t event, void *data)
    case NETDEV_EVENT_TX_COMPLETE:
         task_release();
         break;
-    
+
    default:
         break;
         }
@@ -174,8 +179,8 @@ static int _mac_send_statechart(void)
     ng_netapi_opt_t *conf = NULL;
     int res = 0;
     /* Calculate µs value to tick amount for setting up HW-timer */
-    unsigned long ticks = HWTIMER_TICKS(100000);
-
+    unsigned ticks = HWTIMER_TICKS(100000);
+    csma_mac_dev->driver = &kw2xrf_driver;
     while (1) {
         switch (csma_mac_state) {
 
@@ -195,7 +200,7 @@ static int _mac_send_statechart(void)
                     return -EBUSY;
                     csma_mac_state = CSMA_IDLE;
                 }
-                
+
                 hwtimer_wait(ticks);
                 DEBUG("wait_ended\n");
 
@@ -245,13 +250,13 @@ static int _mac_send_statechart(void)
                 DEBUG("csma_mac-state: CSMA_TX_FRAME\n");
                 /* If ack was not successfull after this timer expires,
                  * mark as CHANNEL_ACCESS_FAILURE */
-                //res = csma_mac_dev->driver->send_data(csma_mac_dev,
-                //                                       (ng_pktsnip_t *)msg.content.ptr);
+                res = csma_mac_dev->driver->send_data(csma_mac_dev,
+                                                       csma_mac_pkt);
 
-                if (res < 1) {
-                    return res;
+                //if (res < 1) {
+                //    return res;
                     /* Signalize failure */
-                }
+                //}
 
                 //timer_set(mac_tmr, CSMA_MAC_TIMER_CH, CSMA_MAC_MAX_ACK_WAIT_DURATION);
                 hwtimer_wait(ticks);
@@ -334,7 +339,7 @@ static void *_csma_mac_thread(void *args)
                 break;
 
             case NG_NETAPI_MSG_TYPE_SND:
-                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SND received, content.value = %i\n", 
+                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SND received, content.value = %i\n",
                             (int)msg.content.value);
                 _mac_send_statechart();
                 break;
@@ -395,6 +400,7 @@ kernel_pid_t csma_mac_init(char *stack, int stacksize, char priority,
     //}
 
     random_init();
+    kw2xrf_init();
     /* If timer event occures, _mac_send_statechart is called in ISR. */
     //timer_init(mac_tmr, us_per_tick, _mac_send_statechart);
     DEBUG("Timer and RNG successfull initialized.\n");
