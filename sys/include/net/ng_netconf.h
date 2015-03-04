@@ -95,6 +95,8 @@ typedef enum {
     NETCONF_STATE_RX,               /**< receive mode */
     NETCONF_STATE_TX,               /**< transmit mode */
     NETCONF_STATE_RESET,            /**< reset mode */
+    NETCONF_STATE_PERFORM_CCA,      /**< CCA is performed, radio trigers int on CCA completition */
+    NETCONF_STATE_AUTO_CCA,         /**< Radio performes CCA automatically before TX */
     /* add other states if needed */
 } ng_netconf_state_t;
 
