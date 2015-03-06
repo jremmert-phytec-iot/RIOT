@@ -56,16 +56,19 @@ static ng_pktsnip_t *csma_mac_pkt = &index_csma_mac_pkt;
 static msg_t msg;
 static mutex_t mutex = MUTEX_INIT;
 static ng_netapi_opt_t *opt;
+static uint8_t cca_ready;
+static uint8_t cca_result;
 
-static void task_block(void){
+static void task_block(int isr_state){
     mutex_lock(&mutex);
 
+    restoreIRQ(isr_state);
     /* try to lock mutex again will cause the thread to go into
      * STATUS_MUTEX_BLOCKED until task_release fires the releasemutex */
     mutex_lock(&mutex);
 }
 
-static void task_release(void){
+inline static void task_release(int dummy){ /* TODO: how to avoid dummy (needed for hwtimer cb) */
     mutex_unlock(&mutex);
 }
 
@@ -77,42 +80,48 @@ static void task_release(void){
  */
 static void _event_cb(ng_netdev_event_t event, void *data)
 {
-    DEBUG("csma_mac: event triggered -> %i\n", event);
+    //DEBUG("csma_mac: event triggered -> %i\n", event);
 
-    ng_pktsnip_t *pkt;
-    ng_netreg_entry_t *sendto;
+    //ng_pktsnip_t *pkt;
+    //ng_netreg_entry_t *sendto;
 
     switch (event) {
 
     case NETDEV_EVENT_RX_COMPLETE:
 
         /* get pointer to the received packet */
-        pkt = (ng_pktsnip_t *)data;
+        //pkt = (ng_pktsnip_t *)data;
         /* find out, who to send the packet to */
-        sendto = ng_netreg_lookup(pkt->next->type, 0);
+        //sendto = ng_netreg_lookup(pkt->next->type, 0);
 
 #if ENABLE_DEBUG
 
-        if (sendto == NULL) {
+        /*if (sendto == NULL) {
             DEBUG("csma_mac: unable to forward packet of type %i\n",
                   pkt->next->type);
-        }
+        }*/
 
 #endif
 
         /* send the packet to everyone interested in it's type */
-        while (sendto != NULL) {
+        /*while (sendto != NULL) {
             DEBUG("csma_mac: sending pkt %p to PID %u\n", pkt, sendto->pid);
-            ng_netapi_send(sendto->pid, pkt);
-            sendto = ng_netreg_getnext(sendto);
-        }
+            //ng_netapi_send(sendto->pid, pkt);
+            //sendto = ng_netreg_getnext(sendto);
+        }*/
         break;
 
    case NETDEV_EVENT_TX_COMPLETE:
-        task_release();
+        break;
+
+   case NETDEV_EVENT_CCA_COMPLETE:
+        cca_ready = 1;
+        cca_result = (*(int8_t*)data);
+        task_release(0);
         break;
 
    default:
+        //DEBUG("csma_mac-error: Unknown Event triggered\n");
         break;
         }
 
@@ -141,7 +150,6 @@ static int backoff_wait(uint8_t backoff_exponent)
     backoff_intervall <<= backoff_exponent;
     backoff_intervall--;
     backoff_intervall *= CSMA_MAC_SYMBOL_LENGTH;
-    DEBUG("Upper limit for backoff_intervall: %i\n", backoff_intervall);
 
     /* Generate 16bit random number */
     if (random_read(buf, 2) != 2) {
@@ -153,11 +161,10 @@ static int backoff_wait(uint8_t backoff_exponent)
     random = random | (0x00ff & buf[1]);
 
     backoff_intervall = random % backoff_intervall;
-    DEBUG("Random number generated: %i\n", random);
 
+    //DEBUG("csma_mac: Backoff wait %ius\n", backoff_intervall);
     //timer_set(mac_tmr, CSMA_MAC_TIMER_CH, backoff_intervall);
-    DEBUG("Backoff wait %i\n", backoff_intervall);
-    hwtimer_wait(backoff_intervall);
+    hwtimer_wait(HWTIMER_TICKS(backoff_intervall));
     return 0;
 }
 
@@ -174,34 +181,30 @@ static int backoff_wait(uint8_t backoff_exponent)
 static int _mac_send_statechart(void)
 {
     ng_netconf_state_t res;
-    /* Calculate µs value to tick amount for setting up HW-timer */
-    unsigned ticks = HWTIMER_TICKS(100000);
+    unsigned state = 0;     /* Used for IRQ disable and restore */
+    cca_ready = 0;
     while (1) {
         switch (csma_mac_state) {
 
             case CSMA_IDLE:
-                DEBUG("csma_mac-state: CSMA_IDLE\n");
+                //DEBUG("csma_mac-state: CSMA_IDLE\n");
                 be = 0;
                 retries = 0;
-                hwtimer_wait(ticks);
                 csma_mac_state = CSMA_PERFORM_CCA;
                 break;
 
             case CSMA_PERFORM_CCA:
-                DEBUG("csma_mac-state: CSMA_PERFORM_CCA\n");
+                //DEBUG("csma_mac-state: CSMA_PERFORM_CCA\n");
 
                 if (be > CSMA_MAC_MAX_BACKOFFS) {
-                    return -EBUSY;
                     csma_mac_state = CSMA_IDLE;
+                    return -EBUSY;
                 }
 
-                //int *index_data = 0;
-                //opt->data =index_data;
-                //opt->data_len = 1;
                 opt->opt = NETCONF_OPT_IS_CHANNEL_CLR;
                 res = dev->driver->set(dev,
                                      opt->opt, opt->data,(size_t)opt->data_len);
-                DEBUG("csma_mac: get CCA returned %i\n", res);
+                //DEBUG("csma_mac-info: get CCA returned %i\n", res);
                 if (res == NETCONF_STATE_PERFORM_CCA){
                     csma_mac_state = CSMA_WAIT;
                     break;
@@ -210,65 +213,67 @@ static int _mac_send_statechart(void)
                     csma_mac_state = CSMA_TX_FRAME;
                     break;
                 }
-                DEBUG("csma_mac-Error: Invalid return from get_cca function\n");
+                //DEBUG("csma_mac-error: Invalid return from get_cca function\n");
+                /*TODO: Return exit code instead of wait */
                 while(1);
                 break;
 
             /*
-             * State-machine jumps to this state if radio performs cca. The task is blocked, 
-             *  therefore the radio must execute an interrupt to unlock the task again.
+             * State-machine jumps to this state if radio performs cca. The task is blocked,
+             * therefore the radio must execute an interrupt to unlock the task again.
              */
             case CSMA_WAIT:
-                DEBUG("csma_mac-state: CSMA_WAIT, task is set to blocking state:\n");
-                task_block();
-                DEBUG("csma_mac-state: CSMA_WAIT, task unblocked");
-
-                if (1) {      //<CCA Successful>
-                    /* As the radio triggers an interrupt when the CCA
-                                             * interval is expired, ask via SPI weather CCA
-                                             * was successfull or not. */
-                    hwtimer_wait(ticks);
-                    csma_mac_state = CSMA_TX_FRAME;
+                //DEBUG("csma_mac-state: CSMA_WAIT, task is set to blocking state:\n");
+                state = disableIRQ();
+                if (cca_ready == 1) {
+                cca_ready = 0;
                 }
                 else {
+                task_block(state);       /* task is unlocked via radio_int -> cb function */
+                mutex_unlock(&mutex);
+                cca_ready = 0;
+                }
+                //DEBUG("csma_mac-info: CSMA_WAIT, task unblocked from callback\n");
+
+                if (cca_result == 1) { /*TODO: Find a better solution for return value*/
+                    csma_mac_state = CSMA_TX_FRAME;
+                    //DEBUG("CCA Successful\n");
+                    break;
+                }
+                else {
+                    DEBUG("csma_mac-info: CCA failed, channel currently busy\n");
+                    csma_mac_state = CSMA_PERFORM_CCA;
+                    //DEBUG("CCA Failed, retry..\n");
                     backoff_wait(be);
                     be ++;
 
-                    if (be > CSMA_MAC_MAX_BE) {     /* return error code */
+                    if (be > CSMA_MAC_MAX_BE) {     /* TODO: return error code */
                         csma_mac_state = CSMA_IDLE;
+                        //DEBUG("CCA Failed, max retries reached. Exiting with failure.\n");
                         return -EBUSY;              /* Resource busy */
                     }
-
-                    hwtimer_wait(ticks);
-                    be++;
-                    csma_mac_state = CSMA_PERFORM_CCA;
                 }
-
                 break;
 
             case CSMA_TX_FRAME:
-                DEBUG("csma_mac-state: CSMA_TX_FRAME\n");
+                //DEBUG("csma_mac-state: CSMA_TX_FRAME\n");
                 /* If ack was not successfull after this timer expires,
                  * mark as CHANNEL_ACCESS_FAILURE */
-                res = dev->driver->send_data(dev,
-                                                       csma_mac_pkt);
-
+                res = dev->driver->send_data(dev, csma_mac_pkt);
+               /*TODO: delete this line if ACK is implemented */
+                csma_mac_state = CSMA_IDLE;
                 //if (res < 1) {
-                //    return res;
+                    return res;
                     /* Signalize failure */
                 //}
 
-                //timer_set(mac_tmr, CSMA_MAC_TIMER_CH, CSMA_MAC_MAX_ACK_WAIT_DURATION);
-                hwtimer_wait(ticks);
+                hwtimer_wait(HWTIMER_TICKS(CSMA_MAC_MAX_ACK_WAIT_DURATION));
                 csma_mac_state = CSMA_WAIT_FOR_ACK;
                 break;
 
             case CSMA_WAIT_FOR_ACK:
-                DEBUG("csma_mac-state: CSMA_WAIT_FOR_ACK\n");
+                //DEBUG("csma_mac-state: CSMA_WAIT_FOR_ACK\n");
                 /* TODO: Determine ISR source */
-                //timer_clear(mac_tmr, CSMA_MAC_TIMER_CH);
-                hwtimer_wait(ticks);
-
                 if (1) {  // <Timer Interrupt>
                     csma_mac_state = CSMA_IDLE;
                     /* Signalize success and return positive number of sent bytes*/
@@ -317,7 +322,7 @@ static void *_csma_mac_thread(void *args)
     //dev->mac_pid = thread_getpid();
     //ng_netif_add(dev->mac_pid);
     /* register the event callback with the device driver */
-    //dev->driver->add_event_callback(dev, _event_cb);
+    dev->driver->add_event_callback(dev, _event_cb);
 
     /* TODO: Ask device for certain HW-MAC Support and store config for statechart
      *       AUTOACK supported?;
@@ -327,26 +332,29 @@ static void *_csma_mac_thread(void *args)
 
     /* start the event loop */
     while (1) {
-        DEBUG("csma_mac: waiting for incoming messages\n");
+        //DEBUG("csma_mac: waiting for incoming messages\n");
         msg_receive(&msg);
         opt = (ng_netapi_opt_t * )msg.content.ptr;
         /* dispatch NETDEV and NETAPI messages */
         switch (msg.type) {
             case NG_NETDEV_MSG_TYPE_EVENT:
-                DEBUG("csma_mac: NG_NETDEV_MSG_TYPE_EVENT received\n");
+                //DEBUG("csma_mac: NG_NETDEV_MSG_TYPE_EVENT received\n");
                 dev->driver->isr_event(dev, msg.content.value);
                 break;
 
             case NG_NETAPI_MSG_TYPE_SND:
-                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SND received, content.value = %i\n",
-                            (int)msg.content.value);
-                _mac_send_statechart();
+                //DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SND received");
+                if(_mac_send_statechart() == 0) {
+                    break;
+                }
+                /* TODO: Inform upper layer that channel is busy */
+                //DEBUG("csma_mac: Channel busy\n");
                 break;
 
             case NG_NETAPI_MSG_TYPE_SET:
                 /* TODO: filter out MAC layer options -> for now forward
                          everything to the device driver */
-                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SET received\n");
+                //DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_SET received\n");
                 /* read incoming options */
                 opt = (ng_netapi_opt_t *)msg.content.ptr;
                 /* set option for device driver */
@@ -360,7 +368,7 @@ static void *_csma_mac_thread(void *args)
             case NG_NETAPI_MSG_TYPE_GET:
                 /* TODO: filter out MAC layer options -> for now forward
                          everything to the device driver */
-                DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_GET received\n");
+                //DEBUG("csma_mac: NG_NETAPI_MSG_TYPE_GET received\n");
                 /* read incoming options */
                 opt = (ng_netapi_opt_t *)msg.content.ptr;
                 /* get option from device driver */
@@ -384,7 +392,6 @@ kernel_pid_t csma_mac_init(char *stack, int stacksize, char priority,
     //unsigned int us_per_tick = 1;
     kernel_pid_t res;
 
-    DEBUG("Timer and RNG successfull initialized.\n");
     /* check if given netdev device is defined */
     if (dev == NULL) {
         return -ENODEV;
@@ -400,7 +407,7 @@ kernel_pid_t csma_mac_init(char *stack, int stacksize, char priority,
 
     random_init();
     /* If timer event occures, _mac_send_statechart is called in ISR. */
-    //timer_init(mac_tmr, us_per_tick, _mac_send_statechart);
-    DEBUG("Timer and RNG successfull initialized.\n");
+    //timer_init(mac_tmr, us_per_tick, task_release);
+    //DEBUG("csma_mac: Timer and RNG successfull initialized.\n");
     return res;
 }

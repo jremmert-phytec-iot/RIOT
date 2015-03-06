@@ -47,6 +47,7 @@ typedef enum {
     NETDEV_EVENT_RX_COMPLETE    = 0x0002,   /**< finished receiving a packet */
     NETDEV_EVENT_TX_STARTED     = 0x0004,   /**< started to transfer a packet */
     NETDEV_EVENT_TX_COMPLETE    = 0x0008,   /**< finished transferring packet */
+    NETDEV_EVENT_CCA_COMPLETE   = 0x000A,   /**< finished CCA */
     /* expand this list if needed */
 } ng_netdev_event_t;
 

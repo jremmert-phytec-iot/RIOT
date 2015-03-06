@@ -34,7 +34,8 @@
 #include "net/ng_netapi.h"
 #include "ng_kw2xrf.h"
 
-#define UNITTESTS_CSMA_MAC_STACKSIZE (KERNEL_CONF_STACKSIZE_DEFAULT)
+//#define UNITTESTS_CSMA_MAC_STACKSIZE (KERNEL_CONF_STACKSIZE_DEFAULT)
+#define UNITTESTS_CSMA_MAC_STACKSIZE (2048)
 #define UNITTESTS_NOMAC_NAME        "unittests_csma_mac"
 
 static char unittests_csma_mac_stack[UNITTESTS_CSMA_MAC_STACKSIZE];
@@ -52,14 +53,16 @@ int main(void)
     ng_netapi_opt_t index_opt;
     ng_netapi_opt_t *opt = &index_opt;
 
-    kw2xrf_init();
-    dev->driver = &kw2xrf_driver;
-    
     int ret = 0;
     int msg_counter = 0;
 
     puts("\nRIOT netdev test");
     puts("Starting csma_mac thread\n");
+    
+    /* TODO: Initialize driver completely, with cb-functions */
+    /* There is an error that cb-function is called before csma_mac thread started.*/
+    kw2xrf_init(dev);
+    dev->driver = &kw2xrf_driver;
     
     msg.type = NG_NETAPI_MSG_TYPE_SND;
     
@@ -67,8 +70,10 @@ int main(void)
                            UNITTESTS_CSMA_MAC_STACKSIZE,
                            PRIORITY_MAIN - 1, UNITTESTS_NOMAC_NAME,
                            dev); 
-    
     while(1){
+        LED_B_TOGGLE;
+        LED_G_TOGGLE;
+
         msg.content.value = msg_counter;
         msg.content.ptr = (char*)opt;
         ret = msg_send(&msg, ng_csma_mac_pid);
@@ -76,5 +81,5 @@ int main(void)
             msg_counter++;
         }
     }
-    return 0;
+    return;
 }
