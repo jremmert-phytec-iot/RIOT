@@ -26,8 +26,8 @@ unlocked_fcfield="fffffffffffffffffffffffffeffffff"
 
 if [ "$retval" == "$unlocked_fcfield" ]; then
 echo -e "Flash configuration tested...${green} [OK]${NC}"
-arm-none-eabi-gdb -tui --command=${1} ${2}
-#cgdb -d arm-none-eabi-gdb --command=${1} ${2}
+#arm-none-eabi-gdb -tui --command=${1} ${2}
+cgdb -d arm-none-eabi-gdb --command=${1} ${2}
 
 else
 echo "Hexdump, .fcfield of $2"
