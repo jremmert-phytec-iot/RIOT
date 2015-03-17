@@ -28,12 +28,11 @@
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
-/* Private member variables, can be accessed via get/set_option of netdev interface */
+ng_netdev_t *kw2xrf_netdev;
 static uint16_t radio_pan;
 static uint8_t  radio_channel;
 static uint16_t radio_address;
 static uint64_t radio_address_long;
-ng_netdev_t *kw2xrf_netdev;
 
 #define MKW2XDRF_OUTPUT_POWER_MAX  8        /**< Maximum output power of the kw2x-rf radio in dBm */
 #define MKW2XDRF_OUTPUT_POWER_MIN  (-35)    /**< Minimum output power of the kw2x-rf radio in dBm */
@@ -99,13 +98,16 @@ int kw2xrf_set_tx_power(int pow)
     return pow;
 }
 
-int kw2xrf_set_channel(unsigned int ch)
+int _set_channel(uint8_t *val, size_t len)
 {
-    radio_channel = ch;
+    if (val[0] < 11 || val[0] > 26) {
+        DEBUG("Invalid channel %i set. Valid channels are 11 through 26\n", val[0]);
+        return -EINVAL;
+    }
 
-    if (ch < 11 || ch > 26) {
-        DEBUG("Invalid channel %i set. Valid channels are 11 through 26\n", ch);
-        return -1;
+    if (len != 2 || val[1] != 0) {
+        DEBUG("kw2xrf: set channel failed, len: %u, val[0]:%u\n", len, val[0]);
+        return -EINVAL;
     }
 
     /*
@@ -115,14 +117,33 @@ int kw2xrf_set_channel(unsigned int ch)
      * F = ((PLL_INT0 + 64) + (PLL_FRAC0/65536))32MHz
      *
      */
-    ch -= 11;
-    kw2xrf_write_dreg(MKW2XDM_PLL_INT0, MKW2XDM_PLL_INT0_VAL(pll_int_lt[ch]));
-    kw2xrf_write_dreg(MKW2XDM_PLL_FRAC0_LSB, (uint8_t)pll_frac_lt[ch]);
-    kw2xrf_write_dreg(MKW2XDM_PLL_FRAC0_MSB, (uint8_t)(pll_frac_lt[ch] >> 8));
-    return ((unsigned int) radio_channel);
+    val[0] -= 11;
+    kw2xrf_write_dreg(MKW2XDM_PLL_INT0, MKW2XDM_PLL_INT0_VAL(pll_int_lt[val[0]]));
+    kw2xrf_write_dreg(MKW2XDM_PLL_FRAC0_LSB, (uint8_t)pll_frac_lt[val[0]]);
+    kw2xrf_write_dreg(MKW2XDM_PLL_FRAC0_MSB, (uint8_t)(pll_frac_lt[val[0]] >> 8));
+    return 2;
 }
 
-void _kw2xrf_set_sequence(kw2xrf_physeq_t seq)
+int _get_channel(uint8_t *val, size_t max)
+{
+    if (max < 2) {
+        return -EOVERFLOW;
+    }
+    uint8_t pll_int = kw2xrf_read_dreg(MKW2XDM_PLL_INT0);
+    uint16_t pll_frac = kw2xrf_read_dreg(MKW2XDM_PLL_FRAC0_LSB);
+    pll_frac |= ((uint16_t)kw2xrf_read_dreg(MKW2XDM_PLL_FRAC0_MSB) << 8);
+
+    for (int i = 0; i < 16; i++) {
+        if ((pll_frac_lt[i] == pll_frac) && (pll_int_lt[i] == pll_int)) {
+            val[0] = i + 11;
+            val[1] = 0;
+            return 2;
+        }
+    }
+    return -EINVAL;
+}
+
+void _set_sequence(kw2xrf_physeq_t seq)
 {
     uint8_t reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
     reg &= ~MKW2XDM_PHY_CTRL1_XCVSEQ_MASK; /* set last three bit to 0 */
@@ -146,22 +167,17 @@ void _kw2xrf_set_sequence(kw2xrf_physeq_t seq)
     //while (!(kw2xrf_read_dreg(MKW2XDM_SEQ_STATE)));
 }
 
-int _tx(void)
+int _set_tx(void)
 {
-    /* programm TR sequence and wait until ready */
-    _kw2xrf_set_sequence(XCVSEQ_TRANSMIT);
-    //     LED_R_OFF; /* Measurement indication for CCA duration */
-    //while (!(kw2xrf_read_dreg(MKW2XDM_IRQSTS1) & MKW2XDM_IRQSTS1_TXIRQ));
-    //LED_G_OFF; /* Measurement indication for TX duration */
-    //kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, MKW2XDM_PHY_CTRL1_XCVSEQ(0));
-    //kw2xrf_switch_to_rx();
+    _set_sequence(XCVSEQ_TRANSMIT);
     return 0;
 }
 
-void kw2xrf_switch_to_rx(void)
+int _set_rx(void)
 {
-    //DEBUG("switch_to_rx: SEQ_STATE: %x\n", kw2xrf_read_dreg(MKW2XDM_SEQ_STATE));
-    _kw2xrf_set_sequence(XCVSEQ_RECEIVE);
+    DEBUG("ng_kw2xrf: info: switch_to_rx\n");
+    _set_sequence(XCVSEQ_RECEIVE);
+    return 0;
 }
 
 /* TODO: Rename, function is general and not rx-specific */
@@ -188,8 +204,8 @@ void kw2xrf_rx_irq(void *args)
         /* handle receive */
         //kw2xrf_rx_handler();
         ng_netdev_event = NETDEV_EVENT_RX_COMPLETE;
-        _kw2xrf_set_sequence(XCVSEQ_IDLE);
-        _kw2xrf_set_sequence(XCVSEQ_RECEIVE);
+        _set_sequence(XCVSEQ_IDLE);
+        _set_sequence(XCVSEQ_RECEIVE);
 
         //typedef void (*ng_netdev_event_cb_t)(ng_netdev_event_t type, void *arg);
         kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_RXIRQ | MKW2XDM_IRQSTS1_SEQIRQ);
@@ -197,7 +213,7 @@ void kw2xrf_rx_irq(void *args)
 
     if (irqst1 & MKW2XDM_IRQSTS1_CCAIRQ) {
         LED_R_ON; /* Measurement indication for TX duration */
-        DEBUG("rx_irq: Readout IRQSTS1: %x\n",reg);
+        DEBUG("kw2xrf: CCA_irq, CCA completed\n");
         kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_CCAIRQ);
     }
 
@@ -207,20 +223,20 @@ void kw2xrf_rx_irq(void *args)
             (irqst2 & MKW2XDM_IRQSTS2_CCA)) {                   /* CCA: Channel busy */
             LED_R_OFF; /* Measurement indication for TX duration */
             ng_netdev_event = NETDEV_EVENT_CCA_CHANNEL_BUSY;
-            DEBUG("rx_irq: Channel Busy\n");
+            DEBUG("kw2xrf: CCA_irq, Channel Busy\n");
             kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_CCAIRQ | MKW2XDM_IRQSTS1_SEQIRQ);
-            _kw2xrf_set_sequence(XCVSEQ_IDLE);
+            _set_sequence(XCVSEQ_IDLE);
         }
         if (irqst1 & MKW2XDM_IRQSTS1_TXIRQ) {
             LED_R_OFF; /* Measurement indication for TX duration */
             ng_netdev_event = NETDEV_EVENT_TX_COMPLETE;
-            DEBUG("rx_irq: TX Complete\n");
+            DEBUG("kw2xrf: TX_irq, Transmission completed\n");
             kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_TXIRQ | MKW2XDM_IRQSTS1_SEQIRQ);
-            _kw2xrf_set_sequence(XCVSEQ_IDLE);
+            _set_sequence(XCVSEQ_IDLE);
         }
         kw2xrf_netdev->event_cb(ng_netdev_event, &status);
     }
-    DEBUG("rx_irq: ng_netdev_event: %i\n", ng_netdev_event);
+    DEBUG("kw2xrf: rx_irq: ng_netdev_event: %i\n", ng_netdev_event);
 }
 
 /* Set up interrupt sources, triggered by the radio-module */
@@ -257,15 +273,22 @@ void kw2xrf_init_interrupts(void)
     DEBUG("PHY_CTRL2: %x\n", kw2xrf_read_dreg(MKW2XDM_PHY_CTRL2));
 }
 
-uint16_t kw2xrf_set_pan(uint16_t pan)
+int _set_pan(uint8_t *val, size_t len)
 {
-    radio_pan = pan;
+    if (len != 2) {
+        return -EINVAL;
+    }
+    kw2xrf_write_iregs(MKW2XDMI_MACPANID0_LSB, val, 2);
+    return 2;
+}
 
-    uint8_t buf[2];
-    buf[0] = (uint8_t)pan;
-    buf[1] = (uint8_t)(pan >> 8);
-    kw2xrf_write_iregs(MKW2XDMI_MACPANID0_LSB, buf, 2);
-    return pan;
+int _get_pan(uint8_t *val, size_t max)
+{
+    if (max < 2) {
+        return -EOVERFLOW;
+    }
+    kw2xrf_read_iregs(MKW2XDMI_MACPANID0_LSB, val, 2);
+    return 2;
 }
 
 int kw2xrf_on(void)
@@ -285,21 +308,48 @@ int kw2xrf_on(void)
                       (MKW2XDM_PWR_MODES_XTALEN | MKW2XDM_PWR_MODES_PMC_MODE));
 
     /* abort any ongoing sequence */
-    _kw2xrf_set_sequence(XCVSEQ_IDLE);
+    _set_sequence(XCVSEQ_IDLE);
 
     return 0;
 }
 
-uint8_t kw2xrf_channel_clear(void){
-    _kw2xrf_set_sequence(XCVSEQ_CCA);   /* start CCA, interrupt is triggered if ready */
+uint8_t _channel_clear(void){
+    _set_sequence(XCVSEQ_CCA);   /* start CCA, interrupt is triggered if ready */
     LED_R_ON; /* Measurement indication for CCA duration */
     return 0;
+}
+
+int _get_address(uint8_t *val, size_t len)
+{
+    if (len == 2) {
+        kw2xrf_read_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, val, 2);
+        return 2;
+    }
+    else if (len == 8){
+        kw2xrf_read_iregs(MKW2XDMI_MACLONGADDRS0_0, val, 8);
+        return 8;
+    }
+    return -ENOTSUP;
+}
+
+int _set_address(uint8_t *val, size_t len)
+{
+    if (len == 2) {
+        kw2xrf_write_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, val, 2);
+        return 2;
+    }
+    else if (len == 8){
+        kw2xrf_write_iregs(MKW2XDMI_MACLONGADDRS0_0, val, 8);
+        return 8;
+    }
+    return -ENOTSUP;
 }
 
 /************************************************************/
 
 int kw2xrf_init(ng_netdev_t *dev) {
     uint8_t reg = 0;
+    uint8_t init_val[2];
     DEBUG("ng_kw2xrf: Initializing\n");
     //dev->type = NETDEV_TYPE_802154;
     //dev->more = NULL;
@@ -317,7 +367,10 @@ int kw2xrf_init(ng_netdev_t *dev) {
 #else
     radio_pan = MKW2XDRF_DEFAULT_RADIO_PAN;
 #endif
-    kw2xrf_set_pan(radio_pan);
+    init_val[0] = (uint8_t)radio_pan;
+    radio_pan = radio_pan >> 8;
+    init_val[1] = (uint8_t)radio_pan;
+    _set_pan((uint8_t *)init_val, 2);
 
     /* Set radio channel. */
 #ifdef MODULE_CONFIG
@@ -325,7 +378,9 @@ int kw2xrf_init(ng_netdev_t *dev) {
 #else
     radio_channel = MKW2XDRF_DEFAULT_CHANNR;
 #endif
-    kw2xrf_set_channel(radio_channel);
+    init_val[0] = radio_channel;
+    init_val[1] = 0;
+    _set_channel((uint8_t *)init_val, 2);
 
     DEBUG("MKW2XDRF initialized and set to channel %i and pan %i.\n",
     MKW2XDRF_DEFAULT_CHANNR, radio_pan);
@@ -372,31 +427,54 @@ int _rem_cb(ng_netdev_t *dev, ng_netdev_event_cb_t cb)
     return 0;
 }
 
-int _get(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t *value_len) {
-    return 0;
+int _get(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t max_len)
+{
+    int res = 0;
+    switch (opt) {
+        case NETCONF_OPT_ADDRESS:
+            res = _get_address((uint8_t *)value, max_len);
+            return res;
+        case NETCONF_OPT_CHANNEL:
+            res = _get_channel((uint8_t *)value, max_len);
+            return res;
+        case NETCONF_OPT_NID:
+            res = _get_pan((uint8_t *)value, max_len);
+            return res;
+        case NETCONF_OPT_IS_CHANNEL_CLR:
+            return _channel_clear();
+        case NETCONF_OPT_STATE:
+            return 0;
+        default:
+            return -ENOTSUP;
+    }
 }
 
-int _set(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t value_len) {
+int _set(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t value_len)
+{
     uint8_t reg;
     switch (opt) {
         case NETCONF_OPT_CHANNEL:
-            return 0;
+            return _set_channel((uint8_t *)value, value_len);
         case NETCONF_OPT_ADDRESS:
-            return 0;
+            return _set_address((uint8_t *)value, value_len);
         case NETCONF_OPT_NID:
-            return 0;
+            return _set_pan((uint8_t *)value, value_len);
         case NETCONF_OPT_IS_CHANNEL_CLR:
-            return kw2xrf_channel_clear();
+            return _channel_clear();
         case NETCONF_OPT_CCA_BEFORE_TX:
             reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
             reg |= MKW2XDM_PHY_CTRL1_CCABFRTX;          /* Set up CCA before TX */
             kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
             return 0;
+        case NETCONF_OPT_AUTOACK:
+     
         case NETCONF_OPT_STATE:
             switch (*((int *)value))
                 case NETCONF_STATE_TX:
-                    DEBUG("KW2xrf: Function _tx entered");
-                    return _tx();
+                    DEBUG("KW2xrf: Function _set_tx entered");
+                    return _set_tx();
+                case NETCONF_STATE_RX:
+                    return _set_rx();
         default:
             return -ENOTSUP;
     }
@@ -411,11 +489,9 @@ int _send(ng_netdev_t *dev, ng_pktsnip_t *pkt)
     uint8_t test[] = "01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010";
     test[0] = 120;
 
-    //DEBUG("ng_kw2xrf: send packet\n");
+    DEBUG("ng_kw2xrf: send packet\n");
 
-    //LED_G_ON; /* Measurement indication for TX duration */
     kw2xrf_write_fifo(test, sizeof(test));
-    //LED_G_OFF; /* Measurement indication for TX duration */
 
     return 0;
 }
