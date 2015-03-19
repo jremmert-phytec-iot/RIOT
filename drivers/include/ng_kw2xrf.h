@@ -56,22 +56,9 @@
 extern "C" {
 #endif
 
-#define MKW2XDRF_MAX_PKT_LENGTH     128      /**< Max packet length for kw2xrf device. */
+#define MKW2XDRF_MAX_PKT_LENGTH     127      /**< Max packet length for kw2xrf device. */
 #define MKW2XDRF_DEFAULT_CHANNR     13       /**< Default radio channel. */
 #define MKW2XDRF_DEFAULT_RADIO_PAN  0x0001   /**< Default radio pan ID */
-
-/**
- *  Structure to represent a kw2xrf packet.
- */
-typedef struct __attribute__((packed))
-{
-    uint8_t length;             /**< The length of the frame of the frame including fcs. */
-    ieee802154_frame_t frame;   /**< The ieee802154 frame. */
-    uint8_t lqi;                /**< The link quality indicator. */
-    int8_t rssi;                /**< The rssi value. */
-    bool crc;                   /**< 1 if crc was successfull, 0 otherwise. */
-}
-kw2xrf_packet_t;
 
 /* Dummy definition for successfull build */
 typedef struct {
@@ -81,6 +68,13 @@ typedef struct {
     kernel_pid_t mac_pid;           /**< the driver's thread's PID */
 /* Devide driver specific fields */
     uint8_t buf[MKW2XDRF_MAX_PKT_LENGTH]; 
+    ng_netconf_state_t state;       /**< Variable to keep radio driver's state */
+    uint8_t seq_nr;                 /**< Next packets sequence number */
+    uint16_t radio_pan;             /**< The PAN the radio device is using */
+    uint8_t radio_channel;          /**< The channel the radio device is using */
+    uint16_t radio_address;         /**< The short address the radio device is using */
+    uint64_t radio_address_long;    /**< The long address the radio device is using */
+    uint16_t options;               /**< Bit field to save enable/disable options */
 } kw2xrf_t;
 
 int kw2xrf_init(ng_netdev_t *dev);

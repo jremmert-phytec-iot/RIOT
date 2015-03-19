@@ -24,6 +24,8 @@
 #include "net/ng_pkt.h"
 #include "periph_conf.h"
 #include "periph/gpio.h"
+#include "net/ng_netif/hdr.h"
+#include "net/ng_pktbuf.h"
 
 #define ENABLE_DEBUG    (0)
 /* Enables integrated testing functions, such as LED-toggling
@@ -499,17 +501,103 @@ void _isr_event(ng_netdev_t *netdev, uint32_t event_type)
 
 int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
 {
-    kw2xrf_t *dev = (kw2xrf_t *)netdev;
-    uint8_t test[] = "_test";
-    test[0] = 6;
-    for (int i = 0; i < test[0]; i++) {
-        dev->buf[i] = test[i];
+    if (netdev == NULL) {
+        return -ENODEV;
     }
+    if (pkt == NULL) {
+        return -ENOMSG;
+    }
+    
+    uint8_t mhr[24];
+    uint8_t index;
+    uint8_t *data = pkt->data;
+    kw2xrf_t *dev = (kw2xrf_t*) netdev;
+    ng_netif_hdr_t *hdr = (ng_netif_hdr_t *) data;
+
+    /* default to data kind TODO: provide means to specify */
+    mhr[0] = 0x01;
+    /* default to wants_ack TODO: provide means to specify */
+    mhr[0] |= 0x20;
+    if (hdr->dst_l2addr_len == 2) {
+        /* default to compress pan TODO: provide means to specify dst PAN*/
+        mhr[0] |= 0x40;
+        /* default to 2 byte addresses for src and dst */
+        mhr[1] |= 0x88;
+        index = 3;
+        mhr[index++] = (uint8_t)((dev->radio_pan)&0xff);
+        mhr[index++] = (uint8_t)((dev->radio_pan)>>8);
+        /* set destination address located directly after ng_ifhrd_t in memory */
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+2);
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+1);
+        /* set source address */
+        mhr[index++] = (uint8_t)((dev->radio_address)&0xff);
+        mhr[index++] = (uint8_t)((dev->radio_address)>>8);
+    }
+    else if (hdr->dst_l2addr_len == 8) {
+        /* default to use long address mode for src and dst */
+        mhr[1] = 0xcc;
+        /* set destination address located directly after ng_ifhrd_t in memory */
+        index = 3;
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+8);
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+7);
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+6);
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+5);
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+4);
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+3);
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+2);
+        mhr[index++] = (uint8_t)*(data+sizeof(ng_netif_hdr_t)+1);
+        /* set source address */
+        mhr[index++] = (uint8_t)((dev->radio_address_long)&0xff);
+        mhr[index++] = (uint8_t)((dev->radio_address_long)>>8);
+        mhr[index++] = (uint8_t)((dev->radio_address_long)>>16);
+        mhr[index++] = (uint8_t)((dev->radio_address_long)>>24);
+        mhr[index++] = (uint8_t)((dev->radio_address_long)>>32);
+        mhr[index++] = (uint8_t)((dev->radio_address_long)>>40);
+        mhr[index++] = (uint8_t)((dev->radio_address_long)>>48);
+        mhr[index++] = (uint8_t)((dev->radio_address_long)>>56);
+    }
+    /* unsupported address length */
+    else {
+        return -ENOMSG;
+    }
+    /* set sequence number */
+    mhr[2] = dev->seq_nr++;
+
+    /* index counts sent bytes from now on */
+    index += 1;
+    for (int i=1; i < index; i++) {
+        /* buf addressing is shifted by one because of len field */
+        dev->buf[i+1] = mhr[i];
+    }
+    
+    while (pkt) {
+        /* check we don't exceed FIFO size */
+        if (index+pkt->size > MKW2XDRF_MAX_PKT_LENGTH) {
+            ng_pktbuf_release(pkt);
+            DEBUG("Packet exceeded FIFO size.\n");
+            return -ENOBUFS;
+        }
+        for (int i=0; i < pkt->size; i++) {
+            uint8_t *tmp = pkt->data; 
+            dev->buf[index+i+1] = tmp[i];
+        }
+        /* count bytes */
+        index += pkt->size;
+    
+        /* next snip */
+        pkt = pkt->next;
+    }
+    dev->buf[0] = index; /* set packet size */
+
     DEBUG("ng_kw2xrf: send packet with size %i\n", dev->buf[0]);
-
     kw2xrf_write_fifo(dev->buf, dev->buf[0]);
+    
+    if ((dev->options&(1<<NETCONF_OPT_PRELOADING)) == NETCONF_DISABLE) {
+        DEBUG("Sending now.\n");
+        _set_sequence(XCVSEQ_TRANSMIT);
+    }
 
-    return 0;
+    return index;
 }
 
 /* implementation of the netdev interface */
