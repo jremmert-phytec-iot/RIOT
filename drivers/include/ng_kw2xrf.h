@@ -56,7 +56,7 @@
 extern "C" {
 #endif
 
-#define MKW2XDRF_MAX_PKT_LENGTH     127      /**< Max packet length for kw2xrf device. */
+#define MKW2XDRF_MAX_PKT_LENGTH     128      /**< Max packet length for kw2xrf device. */
 #define MKW2XDRF_DEFAULT_CHANNR     13       /**< Default radio channel. */
 #define MKW2XDRF_DEFAULT_RADIO_PAN  0x0001   /**< Default radio pan ID */
 
@@ -75,7 +75,12 @@ kw2xrf_packet_t;
 
 /* Dummy definition for successfull build */
 typedef struct {
-    int tmp;
+/* netdev fields */
+    ng_netdev_driver_t *driver;     /**< pointer to the devices interface */
+    ng_netdev_event_cb_t event_cb;  /**< netdev event callback */
+    kernel_pid_t mac_pid;           /**< the driver's thread's PID */
+/* Devide driver specific fields */
+    uint8_t buf[MKW2XDRF_MAX_PKT_LENGTH]; 
 } kw2xrf_t;
 
 int kw2xrf_init(ng_netdev_t *dev);
@@ -83,7 +88,7 @@ int kw2xrf_init(ng_netdev_t *dev);
 /**
  * Netdev representation of this driver.
  */
-extern ng_netdev_t *kw2xrf_netdev;
+//extern ng_netdev_t *kw2xrf_netdev;
 
 extern const ng_netdev_driver_t kw2xrf_driver;
 

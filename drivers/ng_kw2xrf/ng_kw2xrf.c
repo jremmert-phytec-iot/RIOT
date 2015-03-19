@@ -26,6 +26,11 @@
 #include "periph/gpio.h"
 
 #define ENABLE_DEBUG    (0)
+/* Enables integrated testing functions, such as LED-toggling
+ * on state-change and idle-wait functions to test arbitration
+ * using multiple boards.
+ */
+#define TESTING_FUNCTIONS   (1)
 #include "debug.h"
 
 ng_netdev_t *kw2xrf_netdev;
@@ -212,7 +217,9 @@ void kw2xrf_rx_irq(void *args)
     }
 
     if (irqst1 & MKW2XDM_IRQSTS1_CCAIRQ) {
+        #if (TESTING_FUNCTIONS)
         LED_R_ON; /* Measurement indication for TX duration */
+        #endif
         DEBUG("kw2xrf: CCA_irq, CCA completed\n");
         kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_CCAIRQ);
     }
@@ -467,14 +474,20 @@ int _set(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t value_le
             kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
             return 0;
         case NETCONF_OPT_AUTOACK:
-     
+            reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
+            /* Set up HW generated automatic ACK after Receive */
+            reg |= MKW2XDM_PHY_CTRL1_AUTOACK;
+            kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
+            return 0;
         case NETCONF_OPT_STATE:
             switch (*((int *)value))
                 case NETCONF_STATE_TX:
                     DEBUG("KW2xrf: Function _set_tx entered");
-                    return _set_tx();
+                    _set_tx();
+                    return 2;
                 case NETCONF_STATE_RX:
-                    return _set_rx();
+                    _set_rx();
+                    return 2;
         default:
             return -ENOTSUP;
     }
@@ -484,14 +497,17 @@ void _isr_event(ng_netdev_t *netdev, uint32_t event_type)
 {
 }
 
-int _send(ng_netdev_t *dev, ng_pktsnip_t *pkt)
+int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
 {
-    uint8_t test[] = "01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010";
-    test[0] = 120;
+    kw2xrf_t *dev = (kw2xrf_t *)netdev;
+    uint8_t test[] = "_test";
+    test[0] = 6;
+    for (int i = 0; i < test[0]; i++) {
+        dev->buf[i] = test[i];
+    }
+    DEBUG("ng_kw2xrf: send packet with size %i\n", dev->buf[0]);
 
-    DEBUG("ng_kw2xrf: send packet\n");
-
-    kw2xrf_write_fifo(test, sizeof(test));
+    kw2xrf_write_fifo(dev->buf, dev->buf[0]);
 
     return 0;
 }

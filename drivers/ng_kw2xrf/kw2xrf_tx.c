@@ -35,9 +35,9 @@
 static void kw2xrf_gen_pkt(uint8_t *buf, kw2xrf_packet_t *packet);
 static uint8_t sequence_nr;
 
-/* TODO: add global modem cfg_struct for addresses and settings */
 int16_t kw2xrf_send(kw2xrf_packet_t *packet)
 {
+
     /* - FCS + one octet for FRAME_LEN */
     uint8_t pkt[MKW2XDRF_MAX_PKT_LENGTH - 1];
 
