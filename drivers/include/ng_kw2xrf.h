@@ -43,47 +43,87 @@
 #ifndef MKW2XDRF_H_
 #define MKW2XDRF_H_
 
-#include <stdio.h>
 #include <stdint.h>
-#include <stdbool.h>
 
-#include "kernel_types.h"
-#include "ieee802154_frame.h"
-#include "netdev/802154.h"
-#include "net/ng_netdev.h"
+//#include "kernel_types.h"
+#include "kernel.h"
+#include "periph/gpio.h"
+#include "net/ng_netbase.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define MKW2XDRF_MAX_PKT_LENGTH     127      /**< Max packet length for kw2xrf device. */
-#define MKW2XDRF_DEFAULT_CHANNR     13       /**< Default radio channel. */
-#define MKW2XDRF_DEFAULT_RADIO_PAN  0x0001   /**< Default radio pan ID */
+/**
+ * @brief   Maximum payload length that can be send
+ */
+#define KW2XRF_MAX_PAYLOAD_LENGTH     (100U)
+
+/**
+ * @brief   Maximum packet length, including XBee API frame overhead
+ */
+#define KW2XRF_MAX_PKT_LENGTH         (127U)
+
+/**
+ * @brief   Maximum length of a command response
+ */
+//TODO: neccessary?
+//#define KW2XRF_MAX_RESP_LENGTH        (16U)
+
+/**
+ * @brief   Default protocol for data that is coming in
+ */
+#ifdef MODULE_NG_SIXLOWPAN
+#define KW2XRF_DEFAULT_PROTOCOL       NG_NETTYPE_SIXLOWPAN
+#else
+#define KW2XRF_DEFAULT_PROTOCOL       NG_NETTYPE_UNDEF
+#endif
+
+/**
+ * @brief   Default short address used after initialization
+ */
+#define KW2XRF_DEFAULT_SHORT_ADDR     (0x0240)
+
+/**
+ * @brief   Default PAN ID used after initialization
+ */
+#define KW2XRF_DEFAULT_PANID          (0x0001)
+
+/**
+ * @brief   Default channel used after initialization
+ */
+#define KW2XRF_DEFAULT_CHANNEL        (13U)
 
 /* Dummy definition for successfull build */
 typedef struct {
-/* netdev fields */
+    /* netdev fields */
     ng_netdev_driver_t *driver;     /**< pointer to the devices interface */
     ng_netdev_event_cb_t event_cb;  /**< netdev event callback */
     kernel_pid_t mac_pid;           /**< the driver's thread's PID */
-/* Devide driver specific fields */
-    uint8_t buf[MKW2XDRF_MAX_PKT_LENGTH]; 
+    /* Devide driver specific fields */
+    uint8_t buf[MKW2XDRF_MAX_PKT_LENGTH];
     ng_netconf_state_t state;       /**< Variable to keep radio driver's state */
     uint8_t seq_nr;                 /**< Next packets sequence number */
     uint16_t radio_pan;             /**< The PAN the radio device is using */
     uint8_t radio_channel;          /**< The channel the radio device is using */
-    uint16_t radio_address;         /**< The short address the radio device is using */
-    uint64_t radio_address_long;    /**< The long address the radio device is using */
-    uint16_t options;               /**< Bit field to save enable/disable options */
+    uint8_t radio_address[2];         /**< The short address the radio device is using */
+    uint8_t radio_address_long[8];    /**< The long address the radio device is using */
+    uint8_t options;               /**< Bit field to save enable/disable options */
 } kw2xrf_t;
 
-int kw2xrf_init(ng_netdev_t *dev);
+/**
+ * @brief   Initialize the given KW2XRF device
+ *
+ * @param[out] dev          KW2XRF device to initialize
+ *
+ * @return                  0 on success
+ * @return                  -ENODEV on invalid device descriptor
+ */
+int kw2xrf_init(kw2xrf_t *dev);
 
 /**
- * Netdev representation of this driver.
+ * Reference to the KW2XRF driver interface.
  */
-//extern ng_netdev_t *kw2xrf_netdev;
-
 extern const ng_netdev_driver_t kw2xrf_driver;
 
 #ifdef __cplusplus
@@ -91,3 +131,4 @@ extern const ng_netdev_driver_t kw2xrf_driver;
 #endif
 
 #endif
+/** @} */

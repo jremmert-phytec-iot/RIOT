@@ -36,7 +36,7 @@
 #define UNITTESTS_CSMA_MAC_STACKSIZE (KERNEL_CONF_STACKSIZE_DEFAULT)
 #define UNITTESTS_NOMAC_NAME        "unittests_csma_mac"
 
-#define SHELL_TEST      (0)
+#define SHELL_TEST      (1)
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 

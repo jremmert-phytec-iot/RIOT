@@ -21,25 +21,26 @@
 #include "kw2xrf_spi.h"
 #include "kw2xrf_reg.h"
 #include "kw2xrf_internal.h"
-#include "net/ng_pkt.h"
-#include "periph_conf.h"
+//#include "periph_conf.h"
+#include "mutex.h"
+//#include "hwtimer.h"
+#include "msg.h"
+#include "periph/uart.h"
 #include "periph/gpio.h"
-#include "net/ng_netif/hdr.h"
-#include "net/ng_pktbuf.h"
+#include "net/ng_netbase.h"
 
 #define ENABLE_DEBUG    (0)
+#include "debug.h"
 /* Enables integrated testing functions, such as LED-toggling
  * on state-change and idle-wait functions to test arbitration
  * using multiple boards.
  */
 #define TESTING_FUNCTIONS   (1)
-#include "debug.h"
 
-ng_netdev_t *kw2xrf_netdev;
-static uint16_t radio_pan;
-static uint8_t  radio_channel;
-static uint16_t radio_address;
-static uint64_t radio_address_long;
+/**
+ * @brief   Internal driver event type in case of an unexpected interrupt
+ */
+#define ISR_EVENT_UNKNOWN      (0x0020)
 
 #define MKW2XDRF_OUTPUT_POWER_MAX  8        /**< Maximum output power of the kw2x-rf radio in dBm */
 #define MKW2XDRF_OUTPUT_POWER_MIN  (-35)    /**< Minimum output power of the kw2x-rf radio in dBm */
@@ -152,26 +153,50 @@ int _get_channel(uint8_t *val, size_t max)
 
 void _set_sequence(kw2xrf_physeq_t seq)
 {
+    
     uint8_t reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
     reg &= ~MKW2XDM_PHY_CTRL1_XCVSEQ_MASK; /* set last three bit to 0 */
 
-    //if (reg) { /* If radio is not in idle: Abort sequence */
    	if (kw2xrf_read_dreg(MKW2XDM_SEQ_STATE)) {
         /* abort any ongoing sequence */
         DEBUG("tx: abort SEQ_STATE: %x\n", kw2xrf_read_dreg(MKW2XDM_SEQ_STATE));
         kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
-        //kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, MKW2XDM_PHY_CTRL1_XCVSEQ(0));
     	while (kw2xrf_read_dreg(MKW2XDM_SEQ_STATE));
+
+        /* Clear all pending interrupts */
+        kw2xrf_write_dreg(MKW2XDM_IRQSTS1, 0x7f);
+        kw2xrf_write_dreg(MKW2XDM_IRQSTS2, 0x03);
+        kw2xrf_write_dreg(MKW2XDM_IRQSTS3, 0xff);
+
+        /* Mask all possible interrupts */
+        reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL2);
+        reg |= ~(MKW2XDM_PHY_CTRL2_CRC_MSK);
+        kw2xrf_write_dreg(MKW2XDM_PHY_CTRL2, reg);
+
+        reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL3);
+        reg |= (MKW2XDM_PHY_CTRL3_PB_ERR_MSK | MKW2XDM_PHY_CTRL3_WAKE_MSK);
+        reg &= (MKW2XDM_PHY_CTRL3_PB_ERR_MSK | MKW2XDM_PHY_CTRL3_WAKE_MSK);
+        kw2xrf_write_dreg(MKW2XDM_PHY_CTRL2, reg);
     }
-    /* Save unneccessary cpu time and exit at this point if possible */
-    if (seq == XCVSEQ_IDLE){
-        return;
-    }
+    /* For all sequences only enable SEQ-irq, that is set when sequence was completed */
+    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL2);
+    reg &= ~(MKW2XDM_PHY_CTRL2_SEQMSK);
+    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL2, reg);
+
     /* Progrmm new sequence */
-    reg |= MKW2XDM_PHY_CTRL1_XCVSEQ(seq);  /* set last three bit to 1 */
+    reg |= MKW2XDM_PHY_CTRL1_XCVSEQ(seq);
     kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
     DEBUG("ng_kw2xrf: Set sequence to %i\n", seq);
-    //while (!(kw2xrf_read_dreg(MKW2XDM_SEQ_STATE)));
+
+    /* TODO: For testing, ignores CRCVALID in receive mode */
+    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL2);
+    reg &= ~(MKW2XDM_PHY_CTRL4_CRC_MSK);
+    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL2, reg);
+
+    /* TODO: For testing, set up promiscous mode */
+    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
+    reg |= MKW2XDM_PHY_CTRL4_PROMISCUOUS;
+    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL4, reg);
 }
 
 int _set_tx(void)
@@ -187,99 +212,60 @@ int _set_rx(void)
     return 0;
 }
 
-/* TODO: Rename, function is general and not rx-specific */
-void kw2xrf_rx_irq(void *args)
+void kw2xrf_irq_handler(void *args)
 {
+    msg_t msg;
+    kw2xrf_t *dev = (kw2xrf_t *)args;
     uint8_t irqst1 = kw2xrf_read_dreg(MKW2XDM_IRQSTS1);
-    uint8_t irqst2 = kw2xrf_read_dreg(MKW2XDM_IRQSTS2);
-    int8_t status;
-    ng_netdev_event_t ng_netdev_event;
-    DEBUG("rx_irq: IRQSTS1: %x\n", irqst1);
-    DEBUG("rx_irq: IRQSTS2: %x\n", irqst2);
-    /*DEBUG("rx_irq: IRQSTS2: %x\n", kw2xrf_read_dreg(MKW2XDM_IRQSTS2));
-    DEBUG("rx_irq: CTRL1: %x\n", kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1));
-    DEBUG("rx_irq: CTRL2: %x\n", kw2xrf_read_dreg(MKW2XDM_PHY_CTRL2));
-    DEBUG("rx_irq: CTRL3: %x\n", kw2xrf_read_dreg(MKW2XDM_PHY_CTRL3));
-    DEBUG("rx_irq: CTRL4: %x\n", kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4));
-    DEBUG("rx_irq: PLL_INT0: %x\n", kw2xrf_read_dreg(MKW2XDM_PLL_INT0));
-    DEBUG("rx_irq: PLL_FRAC0_LSB: %x\n", kw2xrf_read_dreg(MKW2XDM_PLL_FRAC0_LSB));
-    DEBUG("rx_irq: PLL_FRAC0_MSB: %x\n", kw2xrf_read_dreg(MKW2XDM_PLL_FRAC0_MSB));
-    DEBUG("rx_irq: PA_PWR: %x\n", kw2xrf_read_dreg(MKW2XDM_PA_PWR));
-    DEBUG("rx_irq: PWR_MODES: %x\n", kw2xrf_read_dreg(MKW2XDM_PWR_MODES));
-    */
-    if (irqst1 & MKW2XDM_IRQSTS1_RXIRQ) {
-        /* handle receive */
-        //kw2xrf_rx_handler();
-        ng_netdev_event = NETDEV_EVENT_RX_COMPLETE;
-        _set_sequence(XCVSEQ_IDLE);
-        _set_sequence(XCVSEQ_RECEIVE);
-
-        //typedef void (*ng_netdev_event_cb_t)(ng_netdev_event_t type, void *arg);
+    
+    if ((irqst1 & MKW2XDM_IRQSTS1_RXIRQ) && (irqst1 & MKW2XDM_IRQSTS1_SEQIRQ)) {
+        msg.content.value = NETDEV_EVENT_RX_COMPLETE;
         kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_RXIRQ | MKW2XDM_IRQSTS1_SEQIRQ);
     }
-
-    if (irqst1 & MKW2XDM_IRQSTS1_CCAIRQ) {
-        #if (TESTING_FUNCTIONS)
-        LED_R_ON; /* Measurement indication for TX duration */
-        #endif
-        DEBUG("kw2xrf: CCA_irq, CCA completed\n");
-        kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_CCAIRQ);
+    else if ((irqst1 & MKW2XDM_IRQSTS1_TXIRQ) && (irqst1 & MKW2XDM_IRQSTS1_SEQIRQ)) {
+        msg.content.value = NETDEV_EVENT_TX_COMPLETE;
+        kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_TXIRQ | MKW2XDM_IRQSTS1_SEQIRQ);
+    }
+    else if ((irqst1 & MKW2XDM_IRQSTS1_CCAIRQ) && (irqst1 & MKW2XDM_IRQSTS1_SEQIRQ)) {
+        msg.content.value = NETDEV_EVENT_TX_STARTED;
+        kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_CCAIRQ | MKW2XDM_IRQSTS1_SEQIRQ);
+    }
+    else {
+        msg.content.value = ISR_EVENT_UNKNOWN;
+        /* Clear all interrupts to prevent ISR-loop */
+        kw2xrf_write_dreg(MKW2XDM_IRQSTS1, 0x7f);
+        kw2xrf_write_dreg(MKW2XDM_IRQSTS2, 0x03);
+        kw2xrf_write_dreg(MKW2XDM_IRQSTS3, 0xff);
     }
 
-    if (irqst1 & MKW2XDM_IRQSTS1_SEQIRQ) {
-        ng_netdev_event = NETDEV_EVENT_CCA_CHANNEL_BUSY;        /* default value */
-        if ((irqst1 & MKW2XDM_IRQSTS1_CCAIRQ) &&
-            (irqst2 & MKW2XDM_IRQSTS2_CCA)) {                   /* CCA: Channel busy */
-            LED_R_OFF; /* Measurement indication for TX duration */
-            ng_netdev_event = NETDEV_EVENT_CCA_CHANNEL_BUSY;
-            DEBUG("kw2xrf: CCA_irq, Channel Busy\n");
-            kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_CCAIRQ | MKW2XDM_IRQSTS1_SEQIRQ);
-            _set_sequence(XCVSEQ_IDLE);
-        }
-        if (irqst1 & MKW2XDM_IRQSTS1_TXIRQ) {
-            LED_R_OFF; /* Measurement indication for TX duration */
-            ng_netdev_event = NETDEV_EVENT_TX_COMPLETE;
-            DEBUG("kw2xrf: TX_irq, Transmission completed\n");
-            kw2xrf_write_dreg(MKW2XDM_IRQSTS1, MKW2XDM_IRQSTS1_TXIRQ | MKW2XDM_IRQSTS1_SEQIRQ);
-            _set_sequence(XCVSEQ_IDLE);
-        }
-        kw2xrf_netdev->event_cb(ng_netdev_event, &status);
-    }
-    DEBUG("kw2xrf: rx_irq: ng_netdev_event: %i\n", ng_netdev_event);
+    /* packet is complete */
+    msg.type = NG_NETDEV_MSG_TYPE_EVENT;
+    msg_send_int(&msg, dev->mac_pid);
 }
 
 /* Set up interrupt sources, triggered by the radio-module */
-void kw2xrf_init_interrupts(void)
+void kw2xrf_init_interrupts(kw2xrf_t *dev)
 {
-    /* set up GPIO-pin used for IRQ */
-    gpio_init_int(GPIO_KW2XDRF, GPIO_NOPULL, GPIO_FALLING, &kw2xrf_rx_irq, NULL);
+    /* Disable all interrups:
+     * Selectively enable only one interrupt source selectively in sequence manager.
+     * After reset state all interrupts are disabled, except WAKE_IRQ.
+     */
+    kw2xrf_write_dreg(MKW2XDM_IRQSTS1, 0x7f);
+    kw2xrf_write_dreg(MKW2XDM_IRQSTS2, 0x03);
+    kw2xrf_write_dreg(MKW2XDM_IRQSTS3, 0xff);
 
-    /* Clear interrupt status flags by writing ones to Interrupt Request Status Reg 1 (IRQSTS1) */
-    kw2xrf_write_dreg(MKW2XDM_IRQSTS1, 0xff);
-    /* Clear Packet Buffer Underrun Error IRQ status and Wake Interrupt Status */
-    kw2xrf_write_dreg(MKW2XDM_IRQSTS2, MKW2XDM_IRQSTS2_PB_ERR_IRQ
-                      | MKW2XDM_IRQSTS2_WAKE_IRQ);
-    /* Clear timer interrupt flags */
-    kw2xrf_write_dreg(MKW2XDM_IRQSTS3, 0x0f);
-    /* Print interrupt flag status bits  */
-    DEBUG("IRQSTS1: %x\n", kw2xrf_read_dreg(MKW2XDM_IRQSTS1));
-    DEBUG("IRQSTS2: %x\n", kw2xrf_read_dreg(MKW2XDM_IRQSTS2));
-    DEBUG("IRQSTS3: %x\n", kw2xrf_read_dreg(MKW2XDM_IRQSTS3));
-    uint8_t reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL2);
-    /* Enable interrupt on RX operation */
-    reg &= ~(MKW2XDM_PHY_CTRL2_RXMSK);
-    /* Enable interrupt on CCA ready */
-    reg &= ~(MKW2XDM_PHY_CTRL2_CCAMSK); /* only for measurement indication */
-    /* Enable interrupt on TX ready */
-    //reg &= ~(MKW2XDM_PHY_CTRL2_TXMSK);
-    /* Enable interrupt on SEQ ready */
-    reg &= ~(MKW2XDM_PHY_CTRL2_SEQMSK);
+    /* Mask all possible interrupts */
+    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL2);
+    reg |= ~(MKW2XDM_PHY_CTRL2_CRC_MSK);
     kw2xrf_write_dreg(MKW2XDM_PHY_CTRL2, reg);
-    /* activate promiscous mode for testing*/
-    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
-    reg |= MKW2XDM_PHY_CTRL4_PROMISCUOUS;
-    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL4, reg);
-    DEBUG("PHY_CTRL2: %x\n", kw2xrf_read_dreg(MKW2XDM_PHY_CTRL2));
+
+    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL3);
+    reg |= (MKW2XDM_PHY_CTRL3_PB_ERR_MSK | MKW2XDM_PHY_CTRL3_WAKE_MSK);
+    reg &= (MKW2XDM_PHY_CTRL3_PB_ERR_MSK | MKW2XDM_PHY_CTRL3_WAKE_MSK);
+    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL2, reg);
+
+    /* set up GPIO-pin used for IRQ */
+    gpio_init_int(GPIO_KW2XDRF, GPIO_NOPULL, GPIO_FALLING, &kw2xrf_irq_handler, dev);
 }
 
 int _set_pan(uint8_t *val, size_t len)
@@ -324,11 +310,10 @@ int kw2xrf_on(void)
 
 uint8_t _channel_clear(void){
     _set_sequence(XCVSEQ_CCA);   /* start CCA, interrupt is triggered if ready */
-    LED_R_ON; /* Measurement indication for CCA duration */
     return 0;
 }
 
-int _get_address(uint8_t *val, size_t len)
+int _get_addr(uint8_t *val, size_t len)
 {
     if (len == 2) {
         kw2xrf_read_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, val, 2);
@@ -341,7 +326,7 @@ int _get_address(uint8_t *val, size_t len)
     return -ENOTSUP;
 }
 
-int _set_address(uint8_t *val, size_t len)
+int _set_addr(uint8_t *val, size_t len)
 {
     if (len == 2) {
         kw2xrf_write_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, val, 2);
@@ -354,61 +339,57 @@ int _set_address(uint8_t *val, size_t len)
     return -ENOTSUP;
 }
 
-/************************************************************/
-
-int kw2xrf_init(ng_netdev_t *dev) {
+int kw2xrf_init(kw2xrf_t *dev) {
     uint8_t reg = 0;
-    uint8_t init_val[2];
-    DEBUG("ng_kw2xrf: Initializing\n");
-    //dev->type = NETDEV_TYPE_802154;
-    //dev->more = NULL;
-    kw2xrf_netdev = dev;
-    kw2xrf_spi_init();
+    uint8_t tmp[2];
+
+    /* check device parameters */
+    if (dev == NULL) {
+        return -ENODEV;
+    }
+
     if (!(kw2xrf_on() == 0)) {
         core_panic(0x42, "Could not start MKW2XD radio transceiver");
     }
 
+    /* Gerneral initialization of interrupt sources.
+     * sets radio to idle modewith all interrupt masked
+     */
+    kw2xrf_init_interrupts(dev);
+    kw2xrf_spi_init();
+
+    /* set device driver */
+    dev->driver = &kw2xrf_driver;
+    /* set default options */
+    dev->proto = KW2XRF_DEFAULT_PROTOCOL;
+    dev->options = 0;
+    dev->addr_short[0] = (uint8_t)(KW2XRF_DEFAULT_SHORT_ADDR >> 8);
+    dev->addr_short[1] = (uint8_t)(KW2XRF_DEFAULT_SHORT_ADDR);
+    /* set default short address */
+    _set_addr(dev, dev->addr_short, 2);
+    /* load long address */
+    _get_addr_long(dev, dev->addr_long, 8);
+
     kw2xrf_set_tx_power(0);
 
-    /* Set radio pan id. */
-#ifdef MODULE_CONFIG
-    radio_pan = sysconfig.radio_pan_id;
-#else
-    radio_pan = MKW2XDRF_DEFAULT_RADIO_PAN;
-#endif
-    init_val[0] = (uint8_t)radio_pan;
-    radio_pan = radio_pan >> 8;
-    init_val[1] = (uint8_t)radio_pan;
-    _set_pan((uint8_t *)init_val, 2);
+    /* set default channel */
+    tmp[1] = 0;
+    tmp[0] = KW2XRF_DEFAULT_CHANNEL;
+    _set_channel(dev, tmp, 2);
+    /* set default PAN ID */
+    tmp[1] = (uint8_t)(KW2XRF_DEFAULT_PANID >> 8);
+    tmp[0] = (uint8_t)(KW2XRF_DEFAULT_PANID & 0xff);
+    _set_panid(dev, tmp, 2);
 
-    /* Set radio channel. */
-#ifdef MODULE_CONFIG
-    radio_channel = sysconfig.radio_channel;
-#else
-    radio_channel = MKW2XDRF_DEFAULT_CHANNR;
-#endif
-    init_val[0] = radio_channel;
-    init_val[1] = 0;
-    _set_channel((uint8_t *)init_val, 2);
-
-    DEBUG("MKW2XDRF initialized and set to channel %i and pan %i.\n",
-    MKW2XDRF_DEFAULT_CHANNR, radio_pan);
-
-    kw2xrf_read_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, (uint8_t *)&radio_address, 2);
-    kw2xrf_read_iregs(MKW2XDMI_MACLONGADDRS0_0, (uint8_t *)&radio_address_long, 8);
+    //kw2xrf_read_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, (uint8_t *)kw2xrf_t->radio_address, 2);
+    //kw2xrf_read_iregs(MKW2XDMI_MACLONGADDRS0_0, (uint8_t *)kw2xrf_t->radio_address_long, 8);
 
     /* CCA Setup */
     reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
     reg |= MKW2XDM_PHY_CTRL4_CCATYPE(1); /* Set up CCA mode 1 (RSSI threshold) */
     kw2xrf_write_dreg(MKW2XDM_PHY_CTRL4, reg);
-
-    /* Set CCA mode 1 Threshold (unitless RM p.113, default 75 ->~70dBm) */
-    //reg= 4b;
-    //kw2xrf_write_iregs(MKW2XDMI_CCA1_THRESH,(uint8_t *)&reg, 1);
-    /*******************/
-
-    kw2xrf_init_interrupts();
-    DEBUG("Initialization done..\n");
+    DEBUG("kw2xrf: Initialized and set to channel %i and pan %i.\n",
+    MKW2XDRF_DEFAULT_CHANNR, MKW2XRF_DEFAULT_PANID);
     return 0;
 }
 
@@ -441,7 +422,7 @@ int _get(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t max_len)
     int res = 0;
     switch (opt) {
         case NETCONF_OPT_ADDRESS:
-            res = _get_address((uint8_t *)value, max_len);
+            res = _get_addr((uint8_t *)value, max_len);
             return res;
         case NETCONF_OPT_CHANNEL:
             res = _get_channel((uint8_t *)value, max_len);
@@ -465,7 +446,7 @@ int _set(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t value_le
         case NETCONF_OPT_CHANNEL:
             return _set_channel((uint8_t *)value, value_len);
         case NETCONF_OPT_ADDRESS:
-            return _set_address((uint8_t *)value, value_len);
+            return _set_addr((uint8_t *)value, value_len);
         case NETCONF_OPT_NID:
             return _set_pan((uint8_t *)value, value_len);
         case NETCONF_OPT_IS_CHANNEL_CLR:
@@ -497,6 +478,32 @@ int _set(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t value_le
 
 void _isr_event(ng_netdev_t *netdev, uint32_t event_type)
 {
+    kw2xrf_t *dev = (xbee_t *)netdev;
+    ng_pktsnip_t *pkt_head;
+    ng_pktsnip_t *pkt;
+    ng_netif_hdr_t *hdr;
+    size_t pos;
+    size_t addr_len;
+    uint8_t cksum = 0;
+    
+    /* check device */
+    if (dev == NULL) {
+        return;
+    }
+    
+    if (event_type == NETDEV_EVENT_RX_COMPLETE) {
+         /* TODO: Not handled right now. */
+    }
+    
+    if (event_type == NETDEV_EVENT_TX_STARTED) {
+        uint8_t irqst2 = kw2xrf_read_dreg(MKW2XDM_IRQSTS2);
+        if (irqst2 & MKW2XDM_IRQSTS2_CCA) { /* Channel busy */
+        }
+    }
+    
+    if (event_type == NETDEV_EVENT_TX_COMPLETE) {
+        //return success of send process
+    }
 }
 
 int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
@@ -507,7 +514,7 @@ int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
     if (pkt == NULL) {
         return -ENOMSG;
     }
-    
+
     uint8_t mhr[24];
     uint8_t index;
     uint8_t *data = pkt->data;
@@ -569,7 +576,7 @@ int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
         /* buf addressing is shifted by one because of len field */
         dev->buf[i+1] = mhr[i];
     }
-    
+
     while (pkt) {
         /* check we don't exceed FIFO size */
         if (index+pkt->size > MKW2XDRF_MAX_PKT_LENGTH) {
@@ -578,12 +585,12 @@ int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
             return -ENOBUFS;
         }
         for (int i=0; i < pkt->size; i++) {
-            uint8_t *tmp = pkt->data; 
+            uint8_t *tmp = pkt->data;
             dev->buf[index+i+1] = tmp[i];
         }
         /* count bytes */
         index += pkt->size;
-    
+
         /* next snip */
         pkt = pkt->next;
     }
@@ -591,7 +598,7 @@ int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
 
     DEBUG("ng_kw2xrf: send packet with size %i\n", dev->buf[0]);
     kw2xrf_write_fifo(dev->buf, dev->buf[0]);
-    
+
     if ((dev->options&(1<<NETCONF_OPT_PRELOADING)) == NETCONF_DISABLE) {
         DEBUG("Sending now.\n");
         _set_sequence(XCVSEQ_TRANSMIT);
