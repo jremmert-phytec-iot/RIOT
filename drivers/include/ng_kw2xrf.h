@@ -55,11 +55,6 @@ extern "C" {
 #endif
 
 /**
- * @brief   Maximum payload length that can be send
- */
-#define KW2XRF_MAX_PAYLOAD_LENGTH     (100U)
-
-/**
  * @brief   Maximum packet length, including XBee API frame overhead
  */
 #define KW2XRF_MAX_PKT_LENGTH         (127U)
@@ -101,14 +96,15 @@ typedef struct {
     ng_netdev_event_cb_t event_cb;  /**< netdev event callback */
     kernel_pid_t mac_pid;           /**< the driver's thread's PID */
     /* Devide driver specific fields */
-    uint8_t buf[MKW2XDRF_MAX_PKT_LENGTH];
+    uint8_t buf[KW2XRF_MAX_PKT_LENGTH];
     ng_netconf_state_t state;       /**< Variable to keep radio driver's state */
     uint8_t seq_nr;                 /**< Next packets sequence number */
     uint16_t radio_pan;             /**< The PAN the radio device is using */
     uint8_t radio_channel;          /**< The channel the radio device is using */
-    uint8_t radio_address[2];         /**< The short address the radio device is using */
-    uint8_t radio_address_long[8];    /**< The long address the radio device is using */
-    uint8_t options;               /**< Bit field to save enable/disable options */
+    uint8_t addr_short[2];          /**< The short address the radio device is using */
+    uint8_t addr_long[8];           /**< The long address the radio device is using */
+    uint8_t options;                /**< Bit field to save enable/disable options */
+    ng_nettype_t proto;             /**< Protocol the interface speaks */
 } kw2xrf_t;
 
 /**
