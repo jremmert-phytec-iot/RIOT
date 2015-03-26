@@ -15,12 +15,14 @@ USEMODULE += ng_netif
 USEMODULE += ng_nomac
 USEMODULE += net_help
 USEMODULE += netdev_base
-USEMODULE += ng_csma_mac
+#USEMODULE += ng_csma_mac
+USEMODULE += ng_nomac
 USEMODULE += vtimer
 USEMODULE += ng_netif
 USEMODULE += ng_netapi
 USEMODULE += ng_pktbuf
 USEMODULE += ng_netreg
+USEMODULE += ng_pktdump
 
 DISABLE_MODULE += auto_init
 
@@ -33,8 +35,8 @@ ifeq (native,$(BOARD))
     RECEIVER_PORT ?= tap0
     SENDER_PORT ?= tap1
 else
-    RECEIVER_PORT ?= /dev/ttyUSB1
-    SENDER_PORT ?= /dev/ttyUSB0
+    RECEIVER_PORT ?= /dev/ttyACM0
+    SENDER_PORT ?= /dev/ttyACM1
 endif
 
 ifeq (0,$(SENDER))

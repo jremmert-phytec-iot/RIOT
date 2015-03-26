@@ -26,13 +26,9 @@
 #include "shell_commands.h"
 #include "thread.h"
 #include "net/ng_csma_mac.h"
-#include "net/ng_netapi.h"
-#include "net/ng_netif.h"
-#include "net/ng_netconf.h"
-#include "net/ng_pkt.h"
-#include "net/ng_pktbuf.h"
-#include "net/ng_netif/hdr.h"
 #include "ng_kw2xrf.h"
+#include "net/ng_pktdump.h"
+#include "net/ng_netbase.h"
 
 #include "net/ng_nomac.h"
 #include "net/ng_netif.h"
@@ -44,12 +40,19 @@
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
+#define SHELL_BUFSIZE   (UART0_BUFSIZE)
+
 static char csma_mac_stack[KERNEL_CONF_STACKSIZE_DEFAULT];
 static kernel_pid_t ng_csma_mac_pid = KERNEL_PID_UNDEF;
 
-static kw2xrf_t kw2xrf_dev;
+static kw2xrf_t dev;
 
-#define SHELL_BUFSIZE   (UART0_BUFSIZE)
+/**
+ * @brief   Stack for the pktdump thread
+ */
+static char dump_stack[KERNEL_CONF_STACKSIZE_MAIN];
+
+
 int shell_read(void)
 {
     return (int)getchar();
@@ -62,7 +65,7 @@ void shell_put(int c)
 
 int main(void)
 {
-    kw2xrf_dev.driver = &kw2xrf_driver;
+    dev.driver = &kw2xrf_driver;
 #if(SHELL_TEST == 0)
     msg_t msg;
 
@@ -90,13 +93,13 @@ int main(void)
 
     /* TODO: Initialize driver completely, with cb-functions */
     /* There is an error that cb-function is called before csma_mac thread started.*/
-    kw2xrf_init((ng_netdev_t *)&kw2xrf_dev);
+    kw2xrf_init((ng_netdev_t *)&dev);
     msg.type = NG_NETAPI_MSG_TYPE_SND;
 
     ng_csma_mac_pid = csma_mac_init(csma_mac_stack,
                            KERNEL_CONF_STACKSIZE_DEFAULT,
                            PRIORITY_MAIN - 1, UNITTESTS_NOMAC_NAME,
-                           (ng_netdev_t *)&kw2xrf_dev);
+                           (ng_netdev_t *)&dev);
 
 
     while(1){
@@ -110,19 +113,32 @@ int main(void)
     kernel_pid_t iface;
     int res;
     shell_t shell;
+    ng_netreg_entry_t dump;
 
-    puts("kw2xrf device driver test");
-    /* initialize network modules */
+    puts("KW2XRF device driver test");
+
+    /* initialize network module(s) */
     ng_netif_init();
-    /* setup kw2xrf device */
-    res = kw2xrf_init((ng_netdev_t *)&kw2xrf_dev);
+
+    /* initialize and register pktdump */
+    dump.pid = ng_pktdump_init(dump_stack, sizeof(dump_stack), PRIORITY_MAIN - 2,
+                           "dump");
+    if (dump.pid <= KERNEL_PID_UNDEF) {
+       puts("Error starting pktdump thread");
+        return -1;
+    }
+    dump.demux_ctx = NG_NETREG_DEMUX_CTX_ALL;
+    ng_netreg_register(NG_NETTYPE_UNDEF, &dump);
+
+    /* setup Xbee device */
+    res = kw2xrf_init(&dev);
     if (res < 0) {
         puts("Error initializing kw2xrf device driver");
         return -1;
     }
     /* start MAC layer */
     iface = ng_nomac_init(csma_mac_stack, sizeof(csma_mac_stack), PRIORITY_MAIN - 3,
-                          "kw2xrf_l2", (ng_netdev_t *)&kw2xrf_dev);
+                          "xbee_l2", (ng_netdev_t *)&dev);
     if (iface <= KERNEL_PID_UNDEF) {
         puts("Error initializing MAC layer");
         return -1;
@@ -134,7 +150,7 @@ int main(void)
         return -1;
     }
     /* start the shell */
-    shell_init(&shell, NULL, STDIO_RX_BUFSIZE, shell_read, shell_put);
+    shell_init(&shell, NULL, SHELL_BUFSIZE, shell_read, shell_put);
     shell_run(&shell);
 
 #endif
