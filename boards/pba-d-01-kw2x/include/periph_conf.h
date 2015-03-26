@@ -207,9 +207,11 @@ extern "C"
  * @name SPI configuration
  * @{
  */
-#define SPI_NUMOF           (1U)
-#define SPI_0_EN            1
-#define SPI_IRQ_PRIO        1
+#define SPI_NUMOF               (2U)
+#define SPI_0_EN                1
+#define SPI_1_EN                1
+#define SPI_IRQ_PRIO            1
+#define KINETIS_SPI_USE_HW_CS   1
 
 /* SPI 0 device config */
 #define SPI_0_DEV               SPI0
@@ -232,6 +234,29 @@ extern "C"
 #define SPI_0_SIN_PIN           7
 
 #define SPI_0_PCS0_ACTIVE_LOW   1
+
+/* SPI 1 device config */
+#define SPI_1_DEV               SPI1
+#define SPI_1_INDEX             1
+#define SPI_1_CTAS              0
+#define SPI_1_CLKEN()           (SIM->SCGC6 |= (SIM_SCGC6_SPI1_MASK))
+#define SPI_1_CLKDIS()          (SIM->SCGC6 &= ~(SIM_SCGC6_SPI1_MASK))
+#define SPI_1_IRQ               SPI1_IRQn
+#define SPI_1_IRQ_HANDLER       isr_spi1
+#define SPI_1_FREQ              (48e6)
+
+/* SPI 1 pin1configuration */
+#define SPI_1_PORT              KW2XDRF_PORT
+#define SPI_1_PORT_CLKEN()      KW2XDRF_PORT_CLKEN();
+#define SPI_1_AF                KW2XDRF_PIN_AF
+
+#define SPI_1_PCS0_PIN          KW2XDRF_PCS0_PIN
+#define SPI_1_SCK_PIN           KW2XDRF_SCK_PIN
+#define SPI_1_SOUT_PIN          KW2XDRF_SOUT_PIN
+#define SPI_1_SIN_PIN           KW2XDRF_SIN_PIN
+
+#define SPI_1_PCS0_ACTIVE_LOW   1
+
 /** @} */
 
 
@@ -302,6 +327,7 @@ extern "C"
 #define GPIO_21_EN          1
 #define GPIO_22_EN          1        /* User Button, use as input */
 #define GPIO_23_EN          1        /* KW2XRF INT */
+#define GPIO_24_EN          0        /* KW2XRF CS */
 #define GPIO_IRQ_PRIO       1
 #define ISR_PORT_A          isr_porta
 #define ISR_PORT_B          isr_portb
@@ -477,6 +503,16 @@ extern "C"
 #define GPIO_23_CLKEN()      KW2XDRF_PORT_CLKEN()
 #define GPIO_23_IRQ          KW2XDRF_PORT_IRQn
 #define GPIO_KW2XDRF         GPIO_23
+/* GPIO channel 24 config */
+/*
+#define GPIO_24_DEV          KW2XDRF_GPIO
+#define GPIO_24_PORT         KW2XDRF_PORT
+#define GPIO_24_PORT_BASE    KW2XDRF_PORT_BASE
+#define GPIO_24_PIN          KW2XDRF_PCS0_PIN
+#define GPIO_24_CLKEN()      KW2XDRF_PORT_CLKEN()
+#define GPIO_24_IRQ          KW2XDRF_PORT_IRQn
+#define KW2XRF_CS_GPIO       GPIO_24
+*/
 /** @} */
 
 /**
@@ -502,6 +538,16 @@ extern "C"
 #define KINETIS_RNGA         RNG
 #define RANDOM_CLKEN()       (SIM->SCGC6 |= (1 << 9))
 #define RANDOM_CLKDIS()      (SIM->SCGC6 &= ~(1 << 9))
+
+/** @} */
+
+/**
+ * @name Radio configuration (kw2xrf)
+ * @{
+ */
+#define KW2XRF_SHARED_SPI       0
+#define KW2XRF_SPI              SPI_1
+#define KW2XRF_SPI_SPEED        SPI_SPEED_10MHZ
 
 /** @} */
 
