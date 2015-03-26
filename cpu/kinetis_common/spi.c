@@ -607,6 +607,10 @@ int spi_init_master(spi_t dev, spi_conf_t conf, spi_speed_t speed)
             SPI_0_SCK_PORT->PCR[SPI_0_SCK_PIN] = PORT_PCR_MUX(SPI_0_SCK_AF);
             SPI_0_SOUT_PORT->PCR[SPI_0_SOUT_PIN] = PORT_PCR_MUX(SPI_0_SOUT_AF);
             SPI_0_SIN_PORT->PCR[SPI_0_SIN_PIN] = PORT_PCR_MUX(SPI_0_SIN_AF);
+            if (KINETIS_SPI_USE_HW_CS) {
+                SPI_0_PCS0_PORT_CLKEN();
+                SPI_0_PORT->PCR[SPI_0_PCS0_PIN] = PORT_PCR_MUX(SPI_0_PCS0_AF);
+            }
             break;
 #endif /* SPI_0_EN */
 
@@ -628,6 +632,10 @@ int spi_init_master(spi_t dev, spi_conf_t conf, spi_speed_t speed)
             SPI_1_SCK_PORT->PCR[SPI_1_SCK_PIN] = PORT_PCR_MUX(SPI_1_SCK_AF);
             SPI_1_SOUT_PORT->PCR[SPI_1_SOUT_PIN] = PORT_PCR_MUX(SPI_1_SOUT_AF);
             SPI_1_SIN_PORT->PCR[SPI_1_SIN_PIN] = PORT_PCR_MUX(SPI_1_SIN_AF);
+            if (KINETIS_SPI_USE_HW_CS) {
+                SPI_1_PCS1_PORT_CLKEN();
+                SPI_1_PORT->PCR[SPI_1_PCS0_PIN] = PORT_PCR_MUX(SPI_1_PCS1_AF);
+            }
             break;
 #endif /* SPI_1_EN */
 
@@ -844,6 +852,10 @@ int spi_init_master(spi_t dev, spi_conf_t conf, spi_speed_t speed)
                    | SPI_MCR_CLR_TXF_MASK
                    | SPI_MCR_CLR_RXF_MASK;
 
+    if (KINETIS_SPI_USE_HW_CS) {
+        spi_dev->MCR |= SPI_MCR_PCSIS(1);
+    }
+
     spi_dev->RSER = (uint32_t)0;
 
     return 0;
@@ -939,7 +951,11 @@ static inline uint8_t spi_transfer_internal(SPI_Type *spi_dev, uint32_t flags, u
     /* Wait until there is space in the TXFIFO */
     while (!(spi_dev->SR & SPI_SR_TFFF_MASK));
 
+#if KINETIS_SPI_USE_HW_CS
+    spi_dev->PUSHR = flags | SPI_PUSHR_TXDATA(byte_out) | SPI_PUSHR_PCS(1);
+#else
     spi_dev->PUSHR = flags | SPI_PUSHR_TXDATA(byte_out);
+#endif
 
     /* Wait until we have received a byte */
     while (!(spi_dev->SR & SPI_SR_RXCTR_MASK));
