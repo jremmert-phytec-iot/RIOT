@@ -20,7 +20,7 @@
 #include "ng_kw2xrf.h"
 #include "kw2xrf_spi.h"
 #include "kw2xrf_reg.h"
-#include "kw2xrf_internal.h"
+//#include "kw2xrf_internal.h"
 //#include "periph_conf.h"
 #include "mutex.h"
 //#include "hwtimer.h"
@@ -30,7 +30,7 @@
 #include "net/ng_netbase.h"
 #include "ieee802154_frame.h"
 
-#define ENABLE_DEBUG    (1)
+#define ENABLE_DEBUG    (0)
 #include "debug.h"
 /* Enables integrated testing functions, such as LED-toggling
  * on state-change and idle-wait functions to test arbitration
@@ -90,6 +90,7 @@ static const int level_lt[29] = {
     1, 2, 4, 5,
     7
 };
+
 /**************Internal Functions****************************/
 
 int kw2xrf_set_tx_power(int pow)
@@ -125,6 +126,7 @@ int _get_channel(kw2xrf_t *dev, uint8_t *val, size_t max)
     }
     return -EINVAL;
 }
+
 int _get_sequence(void)
 {
    int reg = 0;
@@ -132,6 +134,7 @@ int _get_sequence(void)
    reg &= MKW2XDM_PHY_CTRL1_XCVSEQ_MASK;
    return reg;
 }
+
 void _set_sequence(kw2xrf_physeq_t seq)
 {
     uint8_t reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
@@ -209,19 +212,6 @@ int _set_channel(kw2xrf_t *dev, uint8_t *val, size_t len)
     kw2xrf_write_dreg(MKW2XDM_PLL_FRAC0_MSB, (uint8_t)(pll_frac_lt[val[0]] >> 8));
     _set_sequence(old_seq);
     return 2;
-}
-
-int _set_tx(void)
-{
-    _set_sequence(XCVSEQ_TRANSMIT);
-    return 0;
-}
-
-int _set_rx(void)
-{
-    DEBUG("ng_kw2xrf: info: switch_to_rx\n");
-    _set_sequence(XCVSEQ_RECEIVE);
-    return 0;
 }
 
 void kw2xrf_irq_handler(void *args)
@@ -319,7 +309,7 @@ int _set_proto(kw2xrf_t *dev, uint8_t *val, size_t len)
     return sizeof(ng_nettype_t);
 }
 
-int kw2xrf_on(void)
+int kw2xrf_on(kw2xrf_t *dev)
 {
     uint8_t tmp;
     /* check modem's crystal oscillator, CLK_OUT shall be 4MHz */
@@ -338,11 +328,7 @@ int kw2xrf_on(void)
     /* abort any ongoing sequence */
     _set_sequence(XCVSEQ_IDLE);
 
-    return 0;
-}
-
-uint8_t _channel_clear(void){
-    _set_sequence(XCVSEQ_CCA);   /* start CCA, interrupt is triggered if ready */
+    dev->state = NETCONF_STATE_IDLE;
     return 0;
 }
 
@@ -392,7 +378,7 @@ int kw2xrf_init(kw2xrf_t *dev) {
     }
 
     kw2xrf_spi_init();
-    if (!(kw2xrf_on() == 0)) {
+    if (!(kw2xrf_on(dev) == 0)) {
         core_panic(0x42, "Could not start MKW2XD radio transceiver");
     }
 
@@ -400,6 +386,10 @@ int kw2xrf_init(kw2xrf_t *dev) {
      * sets radio to idle modewith all interrupt masked
      */
     kw2xrf_init_interrupts(dev);
+
+    /* set device to idle sequence and set state accordingly */
+    _set_sequence(XCVSEQ_IDLE);
+    dev->state = NETCONF_STATE_IDLE;
 
     /* set device driver */
     dev->driver = &kw2xrf_driver;
@@ -423,9 +413,6 @@ int kw2xrf_init(kw2xrf_t *dev) {
     tmp[0] = (uint8_t)(KW2XRF_DEFAULT_PANID & 0xff);
     tmp[1] = (uint8_t)(KW2XRF_DEFAULT_PANID >> 8);
     _set_pan(dev, tmp, 2);
-
-    //kw2xrf_read_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, (uint8_t *)kw2xrf_t->addr_short, 2);
-    //kw2xrf_read_iregs(MKW2XDMI_MACLONGADDRS0_0, (uint8_t *)kw2xrf_t->addr_long, 8);
 
     /* CCA Setup */
     reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
@@ -478,10 +465,16 @@ int _get(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t max_len)
             return _get_pan(dev, (uint8_t *)value, max_len);
         case NETCONF_OPT_PROTO:
             return _get_proto(dev, (uint8_t *)value, max_len);
-        /* TODO: Neccessary? */
-        case NETCONF_OPT_IS_CHANNEL_CLR:
-            return _channel_clear();
+        /* TODO: Is state CCA neccessary? */
+        //case NETCONF_OPT_IS_CHANNEL_CLR:
+        //    _set_sequence(XCVSEQ_CCA);
+            /* TODO: Maybe introduce a new netdev state CCA */
+        //    return 0;
         case NETCONF_OPT_STATE:
+            if (max_len < sizeof(ng_netconf_state_t)) {
+                return -EOVERFLOW;
+            }
+            value = (int *)&(dev->state);
             return 0;
         default:
             return -ENOTSUP;
@@ -504,7 +497,9 @@ int _set(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t value_le
         case NETCONF_OPT_NID:
             return _set_pan(dev, (uint8_t *)value, value_len);
         case NETCONF_OPT_IS_CHANNEL_CLR:
-            return _channel_clear();
+            _set_sequence(XCVSEQ_CCA);
+            /* TODO: create NETCONF state CCA */
+            return 0;
         case NETCONF_OPT_PROTO:
             return _set_proto(dev, (uint8_t *)value, value_len);
         case NETCONF_OPT_CCA_BEFORE_TX:
@@ -519,14 +514,24 @@ int _set(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t value_le
             kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
             return 0;
         case NETCONF_OPT_STATE:
-            switch (*((int *)value))
-                case NETCONF_STATE_TX:
-                    DEBUG("KW2xrf: Function _set_tx entered");
-                    _set_tx();
-                    return 2;
-                case NETCONF_STATE_RX:
-                    _set_rx();
-                    return 2;
+                if((*((int *)value)) == NETCONF_STATE_TX) {
+                    DEBUG("KW2xrf: Set state to TX");
+                    _set_sequence(XCVSEQ_TRANSMIT);
+                    dev->state = NETCONF_STATE_TX;
+                    return 0;
+                }
+                else if((*((int *)value)) == NETCONF_STATE_RX) {
+                    DEBUG("KW2xrf: Set state to RX");
+                    _set_sequence(XCVSEQ_RECEIVE);
+                    dev->state = NETCONF_STATE_RX;
+                    return 0;
+                }
+                else if((*((int *)value)) == NETCONF_STATE_IDLE) {
+                    DEBUG("KW2xrf: Set state to IDLE");
+                    _set_sequence(XCVSEQ_IDLE);
+                    dev->state = NETCONF_STATE_IDLE;
+                    return 0;
+                }
         default:
             return -ENOTSUP;
     }
@@ -535,11 +540,11 @@ int _set(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t value_le
 void _isr_event(ng_netdev_t *netdev, uint32_t event_type)
 {
     kw2xrf_t *dev = (kw2xrf_t *)netdev;
-    //ng_pktsnip_t *pkt_head;
-    //ng_pktsnip_t *pkt;
-    //ng_netif_hdr_t *hdr;
-    //size_t pos;
-   // size_t addr_len;
+    uint8_t pkt_len = 0;
+    ng_netif_hdr_t *hdr;
+    uint8_t index = 0;
+    uint8_t src_addr_len = 0;
+    uint8_t dst_addr_len = 0;
 
     /* check device */
     if (dev == NULL) {
@@ -547,7 +552,67 @@ void _isr_event(ng_netdev_t *netdev, uint32_t event_type)
     }
 
     if (event_type == NETDEV_EVENT_RX_COMPLETE) {
-         /* TODO: Not handled right now. */
+        pkt_len = kw2xrf_read_dreg(MKW2XDM_RX_FRM_LEN);
+
+        /* read PSDU */
+        kw2xrf_read_fifo(dev->buf, pkt_len + 1);
+
+        /* src 16bit addr */
+        if((dev->buf[1] & 0x0c) == 0x08) {
+            src_addr_len = 0x02;
+        }
+        /* src 64bit addr */
+        else if((dev->buf[1] & 0x0c) == 0x0c) {
+            src_addr_len = 0x08;
+        }
+        else {
+            DEBUG("Bogus src address length.");
+        }
+        /* dst 16bit addr */
+        if((dev->buf[1] & 0xc0) == 0x80) {
+            dst_addr_len = 0x02;
+        }
+        /* dst 64bit addr */
+        else if((dev->buf[1] & 0xc0) == 0xc0) {
+            dst_addr_len = 0x08;
+        }
+        else {
+            DEBUG("Bogus src address length.");
+        }
+
+        /* allocate a pktsnip for generic header */
+        ng_pktsnip_t *hdr_snip = ng_pktbuf_add(NULL, NULL, sizeof(ng_netif_hdr_t)+
+                                 src_addr_len, NG_NETTYPE_UNDEF);
+        if (hdr_snip == NULL) {
+            DEBUG("kw2xrf: ERROR allocating header in packet buffer on RX\n");
+            ng_pktbuf_release(hdr_snip);
+            return;
+        }
+        hdr = (ng_netif_hdr_t *)hdr_snip->data;
+        /* init generic header */
+        ng_netif_hdr_init(hdr, src_addr_len, dst_addr_len);
+        /* append src address into memory */
+        if(hdr->dst_l2addr_len == 2) {
+            ng_netif_hdr_set_src_addr(hdr, &(dev->buf[7]), hdr->src_l2addr_len);
+            index = 7 + hdr->src_l2addr_len;
+        }
+        else {
+            ng_netif_hdr_set_src_addr(hdr, &(dev->buf[11]), hdr->src_l2addr_len);
+            index = 11 + hdr->src_l2addr_len;
+        }
+        hdr->if_pid = thread_getpid();
+        hdr->rssi = kw2xrf_read_dreg(MKW2XDM_RSSI_CCA_CNT);
+        hdr->lqi = dev->buf[pkt_len];
+
+        ng_pktsnip_t *payload_snip = ng_pktbuf_add(hdr_snip, (void *)&(dev->buf[index + 1]),
+                                     pkt_len - index, dev->proto);
+        if(payload_snip == NULL) {
+            DEBUG("kw2xrf: ERROR allocating payload in packet buffer on RX\n");
+            ng_pktbuf_release(hdr_snip);
+            return;
+        }
+        dev->event_cb(NETDEV_EVENT_RX_COMPLETE, payload_snip);
+        return;
     }
 
     if (event_type == NETDEV_EVENT_TX_STARTED) {
@@ -646,6 +711,7 @@ int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
         DEBUG("Sending now.\n");
         _set_sequence(XCVSEQ_TRANSMIT);
     }
+    dev->state = NETCONF_STATE_TX;
 
     return index;
 }

@@ -33,7 +33,7 @@ extern "C" {
  *
  * @return 0 if the radio was correctly turned on.
  */
-int kw2xrf_on(void);
+int kw2xrf_on(kw2xrf_t *dev);
 
 /**
  * @brief Turn KW2XRF off.
