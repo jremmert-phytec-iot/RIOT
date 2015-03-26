@@ -29,8 +29,11 @@ extern "C" {
 
 /**
  * @brief SPI interface initialization
+ *
+ * @return 0 on success
+ * @return -1 on error
  */
-void kw2xrf_spi_init(void);
+int kw2xrf_spi_init(void);
 
 /**
  * @brief Writes a byte to the kw2xrf register.
@@ -91,7 +94,7 @@ void kw2xrf_read_iregs(uint8_t addr, uint8_t *buf, uint8_t length);
  *
  * @return number of bytes written.
  */
-radio_packet_length_t kw2xrf_write_fifo(uint8_t *data, radio_packet_length_t data_length);
+void kw2xrf_write_fifo(uint8_t *data, radio_packet_length_t data_length);
 
 /**
  * @brief Reads multiple bytes from the kw2xrf fifo.
@@ -101,7 +104,7 @@ radio_packet_length_t kw2xrf_write_fifo(uint8_t *data, radio_packet_length_t dat
  *
  * @return number of bytes read.
  */
-radio_packet_length_t kw2xrf_read_fifo(uint8_t *data, radio_packet_length_t data_length);
+void kw2xrf_read_fifo(uint8_t *data, radio_packet_length_t data_length);
 
 #ifdef __cplusplus
 }

@@ -21,240 +21,129 @@
 #include "kw2xrf_spi.h"
 #include "kw2xrf_internal.h"
 
+#include "periph/spi.h"
+#include "periph/gpio.h"
 #include "cpu-conf.h"
 #include "irq.h"
 
-/* SPI1 connected to the modem (ieee802.15.4 radio) */
-#define KW2XDRF_SPI                   SPI1
-#define KW2XDRF_SPI_CLKEN()           (SIM->SCGC6 |= (SIM_SCGC6_SPI1_MASK))
-#define KW2XDRF_SPI_CLKDIS()          (SIM->SCGC6 &= ~(SIM_SCGC6_SPI1_MASK))
-#define KW2XDRF_SPI_IRQ               SPI1_IRQn
-#define KW2XDRF_SPI_IRQ_HANDLER       isr_spi1
+#define ENABLE_DEBUG    (0)
+#include "debug.h"
 
-void kw2xrf_spi_init(void)
+#define KW2XRF_IBUF_LENGTH    9
+
+static uint8_t ibuf[KW2XRF_IBUF_LENGTH];
+
+#ifndef KW2XRF_SPI_SPEED
+#define KW2XRF_SPI_SPEED      SPI_SPEED_5MHZ
+#endif
+
+inline void kw2xrf_spi_transfer_head(void)
 {
-    /* enable clocks */
-    KW2XDRF_SPI_CLKEN();
-    KW2XDRF_PORT_CLKEN();
+#if KW2XRF_SHARED_SPI
+    spi_acquire(KW2XRF_SPI);
+    gpio_clear(KW2XRF_CS_GPIO);
+#endif
+}
 
-    /* set pins to AF mode */
-    KW2XDRF_PORT->PCR[KW2XDRF_PCS0_PIN] = PORT_PCR_MUX(KW2XDRF_PIN_AF);
-    KW2XDRF_PORT->PCR[KW2XDRF_SCK_PIN] = PORT_PCR_MUX(KW2XDRF_PIN_AF);
-    KW2XDRF_PORT->PCR[KW2XDRF_SOUT_PIN] = PORT_PCR_MUX(KW2XDRF_PIN_AF);
-    KW2XDRF_PORT->PCR[KW2XDRF_SIN_PIN] = PORT_PCR_MUX(KW2XDRF_PIN_AF);
-    /* enable pullup for sin-pin (miso) */
-    KW2XDRF_PORT->PCR[KW2XDRF_SIN_PIN] |= (PORT_PCR_PE_MASK | PORT_PCR_PS_MASK);
+inline void kw2xrf_spi_transfer_tail(void)
+{
+#if KW2XRF_SHARED_SPI
+    gpio_set(KW2XRF_CS_GPIO);
+    spi_release(KW2XRF_SPI);
+#endif
+}
 
-    /* max spi clock rate for read is 9MHz, for write 16MHz */
-    /* set speed for 8-bit access */
-    KW2XDRF_SPI->CTAR[0] = SPI_CTAR_FMSZ(7)
-                           | SPI_CTAR_PBR(0)
-                           | SPI_CTAR_BR(1);
-    /* set speed for 16-bit access */
-    KW2XDRF_SPI->CTAR[1] = SPI_CTAR_FMSZ(15)
-                           | SPI_CTAR_PBR(0)
-                           | SPI_CTAR_BR(1);
+int kw2xrf_spi_init(void)
+{
+    int res;
 
-    /* enable SPI */
-    KW2XDRF_SPI->MCR = SPI_MCR_MSTR_MASK
-                       | SPI_MCR_PCSIS(1)
-                       | SPI_MCR_DOZE_MASK
-                       | SPI_MCR_CLR_TXF_MASK
-                       | SPI_MCR_CLR_RXF_MASK;
+#if KW2XRF_SHARED_SPI
+    spi_acquire(KW2XRF_SPI);
+#endif
+    res = spi_init_master(KW2XRF_SPI, SPI_CONF_FIRST_RISING, KW2XRF_SPI_SPEED);
+#if KW2XRF_SHARED_SPI
+    spi_release(KW2XRF_SPI);
+    gpio_init_out(KW2XRF_CS_GPIO, GPIO_NOPULL);
+    gpio_set(KW2XRF_CS_GPIO);
+#endif
+    if (res < 0) {
+        DEBUG("kw2xrf_spi_init: error initializing SPI_%i device (code %i)\n",
+              spi_dev, res);
+        return -1;
+    }
 
-    KW2XDRF_SPI->RSER = (uint32_t)0;
+    return 0;
 }
 
 void kw2xrf_write_dreg(uint8_t addr, uint8_t value)
 {
-    while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
-
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(1)
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_TXDATA(((uint16_t)addr << 8) | value);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    KW2XDRF_SPI->POPR;
+    kw2xrf_spi_transfer_head();
+    spi_transfer_reg(KW2XRF_SPI, addr, value, NULL);
+    kw2xrf_spi_transfer_tail();
+    return;
 }
 
 uint8_t kw2xrf_read_dreg(uint8_t addr)
 {
-    addr |= MKW2XDRF_REG_READ;
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
-
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(1)
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_TXDATA((uint16_t)addr << 8);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    return (uint8_t)KW2XDRF_SPI->POPR;
+    uint8_t value;
+    kw2xrf_spi_transfer_head();
+    spi_transfer_reg(KW2XRF_SPI, (addr | MKW2XDRF_REG_READ),
+                                  0x0, (char *)&value);
+    kw2xrf_spi_transfer_tail();
+    return value;
 }
 
 void kw2xrf_write_iregs(uint8_t addr, uint8_t *buf, uint8_t length)
 {
-    uint8_t i;
+    if (length > (KW2XRF_IBUF_LENGTH - 1)) {
+        length = KW2XRF_IBUF_LENGTH - 1;
+    }
+    ibuf[0] = addr;
 
-    while (KW2XDRF_SPI->SR & SPI_SR_TXCTR_MASK);
-
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(1)
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_CONT_MASK
-                         | SPI_PUSHR_TXDATA(((uint16_t)MKW2XDM_IAR_INDEX << 8) | addr);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    KW2XDRF_SPI->POPR;
-
-    for (i = 0; i < (length - 1); i++) {
-        while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
-
-        KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                             | SPI_PUSHR_CONT_MASK
-                             | SPI_PUSHR_PCS(1)
-                             | SPI_PUSHR_TXDATA(buf[i]);
-
-        while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-        KW2XDRF_SPI->POPR;
+    for (uint8_t i = 0; i < length; i++) {
+        ibuf[i + 1] = buf[i];
     }
 
-    while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
+    kw2xrf_spi_transfer_head();
+    spi_transfer_regs(KW2XRF_SPI, MKW2XDM_IAR_INDEX,
+                      (char *)ibuf, NULL, length + 1);
+    kw2xrf_spi_transfer_tail();
 
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_TXDATA(buf[i]);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    KW2XDRF_SPI->POPR;
+    return;
 }
 
 void kw2xrf_read_iregs(uint8_t addr, uint8_t *buf, uint8_t length)
 {
-    uint16_t iaddr = ((uint16_t)(MKW2XDM_IAR_INDEX | MKW2XDRF_REG_READ) << 8) | addr;
-    uint8_t i;
+    if (length > (KW2XRF_IBUF_LENGTH - 1)) {
+        length = KW2XRF_IBUF_LENGTH - 1;
+    }
+    ibuf[0] = addr;
 
-    while (KW2XDRF_SPI->SR & SPI_SR_TXCTR_MASK);
+    kw2xrf_spi_transfer_head();
+    spi_transfer_regs(KW2XRF_SPI, MKW2XDM_IAR_INDEX | MKW2XDRF_REG_READ,
+                      (char *)ibuf, (char *)ibuf, length + 1);
+    kw2xrf_spi_transfer_tail();
 
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(1)
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_CONT_MASK
-                         | SPI_PUSHR_TXDATA(iaddr);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    KW2XDRF_SPI->POPR;
-
-    for (i = 0; i < (length - 1); i++) {
-        while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
-
-        KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                             | SPI_PUSHR_CONT_MASK
-                             | SPI_PUSHR_PCS(1)
-                             | SPI_PUSHR_TXDATA(0);
-
-        while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-        buf[i] = (uint8_t)KW2XDRF_SPI->POPR;
+    for (uint8_t i = 0; i < length; i++) {
+        buf[i] = ibuf[i + 1];
     }
 
-    while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
-
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_TXDATA(0);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    buf[i] = (uint8_t)KW2XDRF_SPI->POPR;
+    return;
 }
 
-/* read / write packet buffer */
-
-radio_packet_length_t kw2xrf_write_fifo(uint8_t *data, radio_packet_length_t length)
+void kw2xrf_write_fifo(uint8_t *data, radio_packet_length_t length)
 {
-    radio_packet_length_t i;
-
-    while (KW2XDRF_SPI->SR & SPI_SR_TXCTR_MASK);
-
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                         | SPI_PUSHR_CONT_MASK
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_TXDATA(MKW2XDRF_BUF_WRITE);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    KW2XDRF_SPI->POPR;
-
-    for (i = 0; i < length; i++) {
-        while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
-
-        KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                             | SPI_PUSHR_CONT_MASK
-                             | SPI_PUSHR_PCS(1)
-                             | SPI_PUSHR_TXDATA((uint8_t)data[i]);
-
-        while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-        KW2XDRF_SPI->POPR;
-    }
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
-
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_TXDATA((uint8_t)data[i]);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    KW2XDRF_SPI->POPR;
-    i++;
-
-    return i;
+    kw2xrf_spi_transfer_head();
+    spi_transfer_regs(KW2XRF_SPI, MKW2XDRF_BUF_WRITE,
+                             (char *)data, NULL, length);
+    kw2xrf_spi_transfer_tail();
 }
 
-radio_packet_length_t kw2xrf_read_fifo(uint8_t *data, radio_packet_length_t length)
+void kw2xrf_read_fifo(uint8_t *data, radio_packet_length_t length)
 {
-    radio_packet_length_t i;
-
-    while (KW2XDRF_SPI->SR & SPI_SR_TXCTR_MASK);
-
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                         | SPI_PUSHR_CONT_MASK
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_TXDATA(MKW2XDRF_BUF_READ);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    KW2XDRF_SPI->POPR;
-
-    for (i = 0; i < (length - 1); i++) {
-        while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
-
-        KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                             | SPI_PUSHR_CONT_MASK
-                             | SPI_PUSHR_PCS(1)
-                             | SPI_PUSHR_TXDATA(0);
-
-        while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-        data[i] = (uint8_t)KW2XDRF_SPI->POPR;
-    }
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_TFFF_MASK));
-
-    KW2XDRF_SPI->PUSHR = SPI_PUSHR_CTAS(0)
-                         | SPI_PUSHR_PCS(1)
-                         | SPI_PUSHR_TXDATA(0);
-
-    while (!(KW2XDRF_SPI->SR & SPI_SR_RXCTR_MASK));
-
-    data[i] = (uint8_t)KW2XDRF_SPI->POPR;
-    i++;
-
-    return i;
+    kw2xrf_spi_transfer_head();
+    spi_transfer_regs(KW2XRF_SPI, MKW2XDRF_BUF_READ, NULL,
+                             (char *)data, length);
+    kw2xrf_spi_transfer_tail();
 }
 /** @} */
