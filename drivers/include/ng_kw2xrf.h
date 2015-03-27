@@ -9,46 +9,20 @@
 /**
  * @defgroup    drivers_kw2xrf kw2x radio-driver
  * @ingroup     drivers
- * @brief       Device driver for the Freescale MKW2xD radio
+ * @brief       Device driver for the Freescale KW2xD radio
  * @{
  *
  * @file
- * @brief       Interface definition for the MKW2xD device driver
+ * @brief       Interface definition for the KW2xD device driver
  *
  * @author     Johann Fischer <j.fischer@phytec.de>
  * @author     Jonas Remmert <j.remmert@phytec.de>
  */
-/*
- * @brief packet buffer
- * <pre>
-     buffer for tx            buffer for rx
-     -----------------         -----------------
-   0 | Frame Length  |       0 | PSDU byte 0   |
-     -----------------         -----------------
-   1 | PSDU byte 0   |       1 | PSDU byte 1   |
-     -----------------         -----------------
-   2 | PSDU byte 1   |       2 | PSDU byte 2   |
-     -----------------         -----------------
- ... |               |     ... |               |
-     -----------------         -----------------
- 125 | PSDU byte 125 |     125 | FCS byte 0    |
-     -----------------         -----------------
- 126 | res. (FCS)    |     126 | FCS byte 1    |
-     -----------------         -----------------
- 127 | res. (FCS)    |     127 | LQI           |
-     -----------------         -----------------
-  </pre>
-*/
 
 #ifndef MKW2XDRF_H_
 #define MKW2XDRF_H_
 
-#include <stdint.h>
-
-//#include "kernel_types.h"
-#include "kernel.h"
-#include "periph/gpio.h"
-#include "net/ng_netbase.h"
+#include "net/ng_netdev.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,12 +32,6 @@ extern "C" {
  * @brief   Maximum packet length, including XBee API frame overhead
  */
 #define KW2XRF_MAX_PKT_LENGTH         (127U)
-
-/**
- * @brief   Maximum length of a command response
- */
-//TODO: neccessary?
-//#define KW2XRF_MAX_RESP_LENGTH        (16U)
 
 /**
  * @brief   Default protocol for data that is coming in
