@@ -38,9 +38,9 @@ try:
     ser.write('ifconfig\r\n')
     i = ser.readline()
     i = ser.readline()
-    #print repr(i)
-    j = "Iface  4   HWaddr: 12:34  Channel: 13  NID: 0x1 \n"
-    #print repr(j)
+    print repr(i)
+    j = "Iface  4   HWaddr: 12:34  Channel: 13  NID: 0x1  State: OFF\n"
+    print repr(j)
     print "ifconfig test:", i == j
     ser.flushInput()
     time.sleep(.1)
