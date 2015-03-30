@@ -60,7 +60,7 @@ extern "C" {
 /* Dummy definition for successfull build */
 typedef struct {
     /* netdev fields */
-    ng_netdev_driver_t *driver;     /**< pointer to the devices interface */
+    ng_netdev_driver_t const *driver;     /**< pointer to the devices interface */
     ng_netdev_event_cb_t event_cb;  /**< netdev event callback */
     kernel_pid_t mac_pid;           /**< the driver's thread's PID */
     /* Devide driver specific fields */

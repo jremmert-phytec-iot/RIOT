@@ -470,10 +470,6 @@ int _get(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t max_len)
             return _get_pan(dev, (uint8_t *)value, max_len);
         case NETCONF_OPT_PROTO:
             return _get_proto(dev, (uint8_t *)value, max_len);
-
-//        case NETCONF_OPT_TX_POWER:
-//            dev->tx_power;
-//            return 2;
         case NETCONF_OPT_STATE:
             if (max_len < sizeof(ng_netconf_state_t)) {
                 return -EOVERFLOW;
