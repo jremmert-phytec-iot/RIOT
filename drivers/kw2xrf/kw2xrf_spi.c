@@ -19,8 +19,6 @@
 #include "kw2xrf.h"
 #include "kw2xrf_reg.h"
 #include "kw2xrf_spi.h"
-#include "kw2xrf_internal.h"
-
 #include "periph/spi.h"
 #include "periph/gpio.h"
 #include "cpu-conf.h"
