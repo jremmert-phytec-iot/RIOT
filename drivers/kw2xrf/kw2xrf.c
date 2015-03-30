@@ -17,7 +17,7 @@
  * @}
  */
 #include "crash.h"
-#include "ng_kw2xrf.h"
+#include "kw2xrf.h"
 #include "kw2xrf_spi.h"
 #include "kw2xrf_reg.h"
 #include "mutex.h"
@@ -168,7 +168,7 @@ void _set_sequence(kw2xrf_physeq_t seq)
     reg &= ~(MKW2XDM_PHY_CTRL1_XCVSEQ_MASK);
     reg |= MKW2XDM_PHY_CTRL1_XCVSEQ(seq);
     kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
-    DEBUG("ng_kw2xrf: Set sequence to %i\n", seq);
+    DEBUG("kw2xrf: Set sequence to %i\n", seq);
 
     /* Unmask all interrupts */
     reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
@@ -729,7 +729,7 @@ int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
     }
     dev->buf[0] = index+2; /* set packet size, reserve additional */
 
-    DEBUG("ng_kw2xrf: send packet with size %i\n", dev->buf[0]);
+    DEBUG("kw2xrf: send packet with size %i\n", dev->buf[0]);
     kw2xrf_write_fifo(dev->buf, dev->buf[0]);
 
     if ((dev->options&(1<<NETCONF_OPT_PRELOADING)) == NETCONF_DISABLE) {
