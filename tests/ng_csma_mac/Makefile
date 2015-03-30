@@ -8,7 +8,8 @@ endif
 
 include ../Makefile.tests_common
 
-USEMODULE += defaulttransceiver
+#USEMODULE += defaulttransceiver
+USEMODULE += kw2xrf
 USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ng_netif
