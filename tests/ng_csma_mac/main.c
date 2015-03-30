@@ -65,7 +65,6 @@ void shell_put(int c)
 
 int main(void)
 {
-    dev.driver = &kw2xrf_driver;
 #if(SHELL_TEST == 0)
     msg_t msg;
 
