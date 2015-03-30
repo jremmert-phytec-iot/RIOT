@@ -26,7 +26,7 @@
 #include "shell_commands.h"
 #include "thread.h"
 #include "net/ng_csma_mac.h"
-#include "ng_kw2xrf.h"
+#include "kw2xrf.h"
 #include "net/ng_pktdump.h"
 #include "net/ng_netbase.h"
 
@@ -43,7 +43,9 @@
 #define SHELL_BUFSIZE   (UART0_BUFSIZE)
 
 static char csma_mac_stack[KERNEL_CONF_STACKSIZE_DEFAULT];
+#if(SHELL_TEST == 0)
 static kernel_pid_t ng_csma_mac_pid = KERNEL_PID_UNDEF;
+#endif
 
 static kw2xrf_t dev;
 
