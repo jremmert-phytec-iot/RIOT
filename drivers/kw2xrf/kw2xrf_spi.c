@@ -16,7 +16,7 @@
  * @author      Jonas Remmert <j.remmert@phytec.de>
  * @}
  */
-#include "ng_kw2xrf.h"
+#include "kw2xrf.h"
 #include "kw2xrf_reg.h"
 #include "kw2xrf_spi.h"
 #include "kw2xrf_internal.h"
