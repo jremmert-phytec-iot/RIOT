@@ -11,6 +11,10 @@ from pexpect import spawn, TIMEOUT, EOF
 
 ser = serial.Serial('/dev/ttyACM0', 115200)
 
+while 1:
+    ser.write('txtsnd 4 01:23 test \r\n')
+    time.sleep(.02)
+
 try:
     ser.flushInput()
     ser.write('ifconfig 4 set addr 12:34\r\n')

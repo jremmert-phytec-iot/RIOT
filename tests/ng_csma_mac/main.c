@@ -49,12 +49,6 @@ static kernel_pid_t ng_csma_mac_pid = KERNEL_PID_UNDEF;
 
 static kw2xrf_t dev;
 
-/**
- * @brief   Stack for the pktdump thread
- */
-static char dump_stack[KERNEL_CONF_STACKSIZE_MAIN];
-
-
 int shell_read(void)
 {
     return (int)getchar();
@@ -121,9 +115,7 @@ int main(void)
     /* initialize network module(s) */
     ng_netif_init();
 
-    /* initialize and register pktdump */
-    dump.pid = ng_pktdump_init(dump_stack, sizeof(dump_stack), PRIORITY_MAIN - 2,
-                           "dump");
+    dump.pid = ng_pktdump_init();
     if (dump.pid <= KERNEL_PID_UNDEF) {
        puts("Error starting pktdump thread");
         return -1;
