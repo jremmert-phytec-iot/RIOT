@@ -154,6 +154,8 @@ void _netif_list(kernel_pid_t dev)
     uint16_t u16;
     int16_t i16;
     int res;
+    memset(hwaddr,0,MAX_ADDR_LEN);
+    u16 = 0;
 
     printf("Iface %2d  ", dev);
 
@@ -310,9 +312,6 @@ static void _netif_set(char *cmd_name, kernel_pid_t dev, char *key, char *value)
     else if ((strcmp("nid", key) == 0) || (strcmp("pan", key) == 0) ||
              (strcmp("pan_id", key) == 0)) {
         _netif_set_u16(dev, NETCONF_OPT_NID, value);
-    }
-    else if (strcmp("power", key) == 0) {
-        _netif_set_i16(dev, NETCONF_OPT_TX_POWER, value);
     }
     else if (strcmp("src_len", key) == 0) {
         _netif_set_u16(dev, NETCONF_OPT_SRC_LEN, value);
