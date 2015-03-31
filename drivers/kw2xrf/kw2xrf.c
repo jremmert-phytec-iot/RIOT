@@ -661,6 +661,7 @@ int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
     kw2xrf_t *dev = (kw2xrf_t*) netdev;
     ng_netif_hdr_t *hdr;
     hdr = (ng_netif_hdr_t *)pkt->data;
+    ng_pktsnip_t *payload;
 
     if (pkt == NULL) {
         return -ENOMSG;
@@ -709,34 +710,35 @@ int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
             dev->buf[index++] = dev->addr_long[i];
         }
     }
-
-    while (pkt) {
+    payload = pkt;
+    while (payload) {
         /* check we don't exceed FIFO size */
-        if (index+2+pkt->size > KW2XRF_MAX_PKT_LENGTH) {
+        if (index+2+payload->size > KW2XRF_MAX_PKT_LENGTH) {
             ng_pktbuf_release(pkt);
             DEBUG("Packet exceeded FIFO size.\n");
             return -ENOBUFS;
         }
-        for (int i=0; i < pkt->size; i++) {
-            uint8_t *tmp = pkt->data;
-            dev->buf[index+i+1] = tmp[i];
-        }
-        /* count bytes */
-        index += pkt->size;
-
-        /* next snip */
-        pkt = pkt->next;
+        memcpy(&(dev->buf[index+1]), payload->data, payload->size);
+        index += payload->size;
+        payload = payload->next;
     }
     dev->buf[0] = index+2; /* set packet size, reserve additional */
 
     DEBUG("kw2xrf: send packet with size %i\n", dev->buf[0]);
+
+    /* Disable IRQ to prevent TX-ready irq while spi write is in progress */
+    gpio_irq_disable(GPIO_KW2XDRF);
     kw2xrf_write_fifo(dev->buf, dev->buf[0]);
+
+    ng_pktbuf_release(pkt);
 
     if ((dev->options&(1<<NETCONF_OPT_PRELOADING)) == NETCONF_DISABLE) {
         DEBUG("kw2xrf: Sending now.\n");
         _set_sequence(XCVSEQ_TRANSMIT);
     }
     dev->state = NETCONF_STATE_TX;
+
+    gpio_irq_enable(GPIO_KW2XDRF);
 
     return index;
 }
