@@ -57,6 +57,11 @@ extern "C" {
  */
 #define KW2XRF_DEFAULT_CHANNEL        (13U)
 
+/**
+ * @brief   Default TX_POWER in dbm used after initialization
+ */
+#define KW2XRF_DEFAULT_TX_POWER        (0)
+
 /* Dummy definition for successfull build */
 typedef struct {
     /* netdev fields */
@@ -72,6 +77,7 @@ typedef struct {
     uint8_t addr_short[2];          /**< The short address the radio device is using */
     uint8_t addr_long[8];           /**< The long address the radio device is using */
     uint8_t options;                /**< Bit field to save enable/disable options */
+    int8_t tx_power;
     ng_nettype_t proto;             /**< Protocol the interface speaks */
 } kw2xrf_t;
 
