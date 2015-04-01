@@ -65,6 +65,16 @@ void shell_put(int c)
  */
 int main(void)
 {
+    dev.spi = AT86RF231_SPI;
+    dev.spi_speed = AT86RF231_SPI_SPEED;
+    dev.cs_pin = AT86RF231_CS;
+    dev.sleep_pin = AT86RF231_SLEEP;
+    dev.reset_pin = AT86RF231_RESET;
+    dev.int_pin = AT86RF231_INT;
+
+
+    dev.driver = &ng_at86rf2xx_driver;
+    
     kernel_pid_t iface;
     shell_t shell;
     ng_netreg_entry_t dump;

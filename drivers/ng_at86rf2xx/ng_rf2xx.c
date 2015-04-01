@@ -94,13 +94,15 @@ void ng_at86rf2xx_on(ng_at86rf2xx_t *dev)
 
 void ng_at86rf2xx_switch_to_rx(ng_at86rf2xx_t *dev)
 {
+    DEBUG("switch to rx not supported yet, skipping\n");
+    return;
     gpio_irq_disable(dev->int_pin);
 
     /* now change to PLL_ON state for extended operating mode */
     ng_at86rf2xx_reg_write(dev, NG_AT86RF2XX_REG__TRX_STATE, NG_AT86RF2XX_TRX_STATE__PLL_ON);
 
     do {
-        int max_wait = _MAX_RETRIES;
+        int max_wait = 3;
         if (!--max_wait) {
             DEBUG("at86rf2xx : ERROR : could not enter PLL_ON mode\n");
             break;
@@ -121,7 +123,7 @@ void ng_at86rf2xx_switch_to_rx(ng_at86rf2xx_t *dev)
     ng_at86rf2xx_reg_write(dev, NG_AT86RF2XX_REG__TRX_STATE, NG_AT86RF2XX_TRX_STATE__RX_AACK_ON);
 
     do {
-        int max_wait = _MAX_RETRIES;
+        int max_wait = 3;
         if (!--max_wait) {
             DEBUG("at86rf2xx : ERROR : could not enter RX_AACK_ON mode\n");
             break;
@@ -196,14 +198,14 @@ int ng_at86rf2xx_change_state(ng_at86rf2xx_t *dev, ng_netconf_state_t state)
             return ng_at86rf2xx_change_state(dev, NETCONF_STATE_IDLE);
 
         default:
-            DEBUG("%02x not supported.\n");
+            DEBUG("not supported.\n");
             return -ENOTSUP;
     }
 
     int max_wait = _MAX_RETRIES;
     do {
         if (!--max_wait) {
-            DEBUG("at86rf2xx : ERROR : could not enter %02x mode\n", des_mode);
+            DEBUG("at86rf2xx : ERROR : could not enter des_mode mode\n");
         }
     } while (ng_at86rf2xx_get_status(dev)
              == NG_AT86RF2XX_TRX_STATUS__STATE_TRANSITION_IN_PROGRESS);
