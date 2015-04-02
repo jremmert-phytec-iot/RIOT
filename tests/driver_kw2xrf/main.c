@@ -61,32 +61,40 @@ int main(void)
     ng_netif_init();
 
     dump.pid = ng_pktdump_init();
+
     if (dump.pid <= KERNEL_PID_UNDEF) {
-       puts("Error starting pktdump thread");
+        puts("Error starting pktdump thread");
         return -1;
     }
+
     dump.demux_ctx = NG_NETREG_DEMUX_CTX_ALL;
     ng_netreg_register(NG_NETTYPE_UNDEF, &dump);
 
     /* setup KW2x device */
     res = kw2xrf_init(&dev);
+
     if (res < 0) {
         puts("Error initializing kw2xrf device driver");
         return -1;
     }
+
     /* start MAC layer */
     iface = ng_nomac_init(nomac_stack, sizeof(nomac_stack), PRIORITY_MAIN - 3,
                           "kw2xrf", (ng_netdev_t *)&dev);
+
     if (iface <= KERNEL_PID_UNDEF) {
         puts("Error initializing MAC layer");
         return -1;
     }
+
     /* register network device */
     res = ng_netif_add(iface);
+
     if (res < 0) {
         puts("Error registering network device with netif");
         return -1;
     }
+
     /* start the shell */
     shell_init(&shell, NULL, SHELL_BUFSIZE, shell_read, shell_put);
     shell_run(&shell);
