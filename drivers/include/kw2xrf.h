@@ -76,7 +76,7 @@ typedef struct {
     ng_netdev_event_cb_t event_cb;        /**< netdev event callback */
     kernel_pid_t mac_pid;                 /**< the driver's thread's PID */
     /* Devide driver specific fields */
-    uint8_t buf[KW2XRF_MAX_PKT_LENGTH];   /**> Buffer for the kw2x radio device */
+    uint8_t buf[KW2XRF_MAX_PKT_LENGTH];   /**< Buffer for the kw2x radio device */
     ng_netconf_state_t state;             /**< Variable to keep radio driver's state */
     uint8_t seq_nr;                       /**< Next packets sequence number */
     uint16_t radio_pan;                   /**< The PAN the radio device is using */
