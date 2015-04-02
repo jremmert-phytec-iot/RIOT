@@ -16,6 +16,7 @@
  * @author      Jonas Remmert <j.remmert@phytec.de>
  * @}
  */
+
 #include "crash.h"
 #include "kw2xrf.h"
 #include "kw2xrf_spi.h"
@@ -32,9 +33,6 @@
  * @brief   Internal driver event type in case of an unexpected interrupt
  */
 #define ISR_EVENT_UNKNOWN      (0x0020)
-
-#define MKW2XDRF_OUTPUT_POWER_MAX  8        /**< Maximum output power of the kw2x-rf radio in dBm */
-#define MKW2XDRF_OUTPUT_POWER_MIN  (-35)    /**< Minimum output power of the kw2x-rf radio in dBm */
 
 /* Modem_PA_PWR Register (PA Power Control) has a valid range from 3-31 */
 #define MKW2XDRF_PA_RANGE_MAX      31       /**< Maximum value of PA Power Control Register */
@@ -266,6 +264,15 @@ void kw2xrf_init_interrupts(kw2xrf_t *dev)
     gpio_init_int(GPIO_KW2XDRF, GPIO_NOPULL, GPIO_FALLING, &kw2xrf_irq_handler, dev);
 }
 
+int _get_pan(kw2xrf_t *dev, uint8_t *val, size_t max)
+{
+    if (max < 2) {
+        return -EOVERFLOW;
+    }
+    kw2xrf_read_iregs(MKW2XDMI_MACPANID0_LSB, val, 2);
+    return 2;
+}
+
 int _set_pan(kw2xrf_t *dev, uint8_t *val, size_t len)
 {
     if (len != 2) {
@@ -273,19 +280,9 @@ int _set_pan(kw2xrf_t *dev, uint8_t *val, size_t len)
     }
     gpio_irq_disable(GPIO_KW2XDRF);
     kw2xrf_write_iregs(MKW2XDMI_MACPANID0_LSB, val, 2);
-    dev->radio_pan = val[1];
-    dev->radio_pan = (dev->radio_pan) <<8;
-    dev->radio_pan |= val[0];
+    (dev->radio_pan)[0] = val[0];
+    (dev->radio_pan)[1] = val[1];
     gpio_irq_enable(GPIO_KW2XDRF);
-    return 2;
-}
-
-int _get_pan(kw2xrf_t *dev, uint8_t *val, size_t max)
-{
-    if (max < 2) {
-        return -EOVERFLOW;
-    }
-    kw2xrf_read_iregs(MKW2XDMI_MACPANID0_LSB, val, 2);
     return 2;
 }
 
@@ -337,7 +334,10 @@ int _get_addr_short(kw2xrf_t *dev, uint8_t *val, size_t len)
     if (len < 2) {
         return -EOVERFLOW;
     }
-    kw2xrf_read_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, val, 2);
+    uint8_t tmp[2];
+    kw2xrf_read_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, tmp, 2);
+    val[0] = tmp[1];
+    val[1] = tmp[0];
     return 2;
 }
 
@@ -354,18 +354,23 @@ int _set_addr(kw2xrf_t *dev, uint8_t *val, size_t len)
 {
     gpio_irq_disable(GPIO_KW2XDRF);
     if (len == 2) {
+        dev->addr_short[0] = val[1];
+        dev->addr_short[1] = val[0];
         kw2xrf_write_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, val, 2);
         gpio_irq_enable(GPIO_KW2XDRF);
-        dev->addr_short[0] = val[0];
-        dev->addr_short[1] = val[1];
         return 2;
     }
     else if (len == 8){
+        dev->addr_long[0] = val[8];
+        dev->addr_long[1] = val[7];
+        dev->addr_long[2] = val[6];
+        dev->addr_long[3] = val[5];
+        dev->addr_long[4] = val[4];
+        dev->addr_long[5] = val[3];
+        dev->addr_long[6] = val[2];
+        dev->addr_long[7] = val[1];
         kw2xrf_write_iregs(MKW2XDMI_MACLONGADDRS0_0, val, 8);
         gpio_irq_enable(GPIO_KW2XDRF);
-        for (int i=0; i<8; i++) {
-            dev->addr_long[i] = val[i];
-        }
         return 8;
     }
     return -ENOTSUP;
@@ -374,9 +379,6 @@ int _set_addr(kw2xrf_t *dev, uint8_t *val, size_t len)
 int kw2xrf_init(kw2xrf_t *dev) {
     uint8_t reg = 0;
     uint8_t tmp[2];
-
-    dev->radio_channel = KW2XRF_DEFAULT_CHANNEL;
-    dev->tx_power = KW2XRF_DEFAULT_TX_POWER;
 
     /* check device parameters */
     if (dev == NULL) {
@@ -398,21 +400,24 @@ int kw2xrf_init(kw2xrf_t *dev) {
     /* set default options */
     dev->proto = KW2XRF_DEFAULT_PROTOCOL;
     dev->options = 0;
-    dev->addr_short[0] = (uint8_t)(KW2XRF_DEFAULT_SHORT_ADDR >> 8);
-    dev->addr_short[1] = (uint8_t)(KW2XRF_DEFAULT_SHORT_ADDR);
+    tmp[1] = (uint8_t)(KW2XRF_DEFAULT_SHORT_ADDR);
+    tmp[0] = (uint8_t)(KW2XRF_DEFAULT_SHORT_ADDR >> 8);
     /* set default short address */
-    _set_addr(dev, dev->addr_short, 2);
+    _set_addr(dev, tmp, 2);
     /* load long address */
     _get_addr_long(dev, dev->addr_long, 8);
 
+    /* set default TX-Power */
+    dev->tx_power = KW2XRF_DEFAULT_TX_POWER;
     _set_tx_power(dev, &(dev->tx_power), sizeof(dev->tx_power));
 
     /* set default channel */
+    dev->radio_channel = KW2XRF_DEFAULT_CHANNEL;
     tmp[0] = dev->radio_channel;
     tmp[1] = 0;
     _set_channel(dev, tmp, 2);
     /* set default PAN ID */
-    tmp[0] = (uint8_t)(KW2XRF_DEFAULT_PANID & 0xff);
+    tmp[0] = (uint8_t)(KW2XRF_DEFAULT_PANID);
     tmp[1] = (uint8_t)(KW2XRF_DEFAULT_PANID >> 8);
     _set_pan(dev, tmp, 2);
 
@@ -423,15 +428,6 @@ int kw2xrf_init(kw2xrf_t *dev) {
     DEBUG("kw2xrf: Initialized and set to channel %i and pan %i.\n",
     KW2XRF_DEFAULT_CHANNEL, KW2XRF_DEFAULT_PANID);
 
-    /* TODO: For testing, ignores CRCVALID in receive mode */
-    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL2);
-    reg &= ~(MKW2XDM_PHY_CTRL2_CRC_MSK);
-    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL2, reg);
-
-    /* TODO: For testing, set up promiscous mode */
-    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
-    reg |= MKW2XDM_PHY_CTRL4_PROMISCUOUS;
-    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL4, reg);
     return 0;
 }
 
@@ -522,17 +518,24 @@ int _set(ng_netdev_t *netdev, ng_netconf_opt_t opt, void *value, size_t value_le
         case NETCONF_OPT_CCA_BEFORE_TX:
             reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
             reg |= MKW2XDM_PHY_CTRL1_CCABFRTX;          /* Set up CCA before TX */
-            gpio_irq_enable(GPIO_KW2XDRF);
-            kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
             gpio_irq_disable(GPIO_KW2XDRF);
+            kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
+            gpio_irq_enable(GPIO_KW2XDRF);
             return 0;
         case NETCONF_OPT_AUTOACK:
+            gpio_irq_disable(GPIO_KW2XDRF);
             reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
             /* Set up HW generated automatic ACK after Receive */
             reg |= MKW2XDM_PHY_CTRL1_AUTOACK;
-            gpio_irq_enable(GPIO_KW2XDRF);
             kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
+            gpio_irq_enable(GPIO_KW2XDRF);
+            return 0;
+        case NETCONF_OPT_PROMISCUOUSMODE:
             gpio_irq_disable(GPIO_KW2XDRF);
+            reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
+            reg |= MKW2XDM_PHY_CTRL4_PROMISCUOUS;
+            kw2xrf_write_dreg(MKW2XDM_PHY_CTRL4, reg);
+            gpio_irq_enable(GPIO_KW2XDRF);
             return 0;
         case NETCONF_OPT_STATE:
                 if(*((ng_netconf_state_t *)value) == NETCONF_STATE_TX) {
@@ -701,35 +704,41 @@ int _send(ng_netdev_t *netdev, ng_pktsnip_t *pkt)
     dev->buf[1] = 0x01;
     /* set sequence number */
     dev->buf[3] = dev->seq_nr++;
-
-
+    index = 4;
     if (hdr->dst_l2addr_len == 2) {
-        index = 4;
         /* set to short addressing mode */
         dev->buf[2] = 0x88;
-        /* set destination pan_id TODO: not currect currently */
-        dev->buf[index++] = (uint8_t)dev->radio_pan;
-        dev->buf[index++] = (uint8_t)((dev->radio_pan)>>8);
-        index += 2;
+        /* set destination pan_id */
+        dev->buf[index++] = (uint8_t)(dev->radio_pan)[0];
+        dev->buf[index++] = (uint8_t)(dev->radio_pan)[1];
+        /* set destination address, byte order is inverted */
+        dev->buf[index++] = (ng_netif_hdr_get_dst_addr(hdr))[1];
+        dev->buf[index++] = (ng_netif_hdr_get_dst_addr(hdr))[0];
         /* set source pan_id */
-        dev->buf[index++] = (uint8_t)dev->radio_pan;
-        dev->buf[index++] = (uint8_t)((dev->radio_pan)>>8);
+        dev->buf[index++] = (uint8_t)(dev->radio_pan)[0];
+        dev->buf[index++] = (uint8_t)(dev->radio_pan)[1];
         /* set source address */
-        dev->buf[index++] = dev->addr_short[1];
         dev->buf[index++] = dev->addr_short[0];
+        dev->buf[index++] = dev->addr_short[1];
     }
-    else if (hdr->dst_l2addr_len == 8) {
+    if (hdr->dst_l2addr_len == 8) {
+        /* set destination pan_id, wireshark expects it there */
+        dev->buf[index++] = (uint8_t)(dev->radio_pan)[0];
+        dev->buf[index++] = (uint8_t)(dev->radio_pan)[1];
         /* default to use long address mode for src and dst */
-        dev->buf[2] = 0xcc;
+        dev->buf[2] |= 0xcc;
         /* set destination address located directly after ng_ifhrd_t in memory */
-        index = 4;
+        memcpy(&(dev->buf)[index], ng_netif_hdr_get_dst_addr(hdr),8);
         index += 8;
+        /* set source pan_id, wireshark expects it there */
+        dev->buf[index++] = (uint8_t)(dev->radio_pan)[0];
+        dev->buf[index++] = (uint8_t)(dev->radio_pan)[1];
         /* set source address */
         for(int i=0; i<8; i++) {
             dev->buf[index++] = dev->addr_long[i];
         }
     }
-    payload = pkt;
+    payload = pkt->next;
     while (payload) {
         /* check we don't exceed FIFO size */
         if (index+2+payload->size > KW2XRF_MAX_PKT_LENGTH) {

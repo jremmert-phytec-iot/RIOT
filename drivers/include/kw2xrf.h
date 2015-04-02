@@ -62,6 +62,16 @@ extern "C" {
  */
 #define KW2XRF_DEFAULT_TX_POWER        (0)
 
+/**
+ * @brief   Maximum TX_POWER in dbm
+ */
+#define MKW2XDRF_OUTPUT_POWER_MAX       8
+
+/**
+ * @brief   Minimum TX_POWER in dbm
+ */
+#define MKW2XDRF_OUTPUT_POWER_MIN       (-35)
+
 /* Dummy definition for successfull build */
 typedef struct {
     /* netdev fields */
@@ -72,7 +82,7 @@ typedef struct {
     uint8_t buf[KW2XRF_MAX_PKT_LENGTH];
     ng_netconf_state_t state;       /**< Variable to keep radio driver's state */
     uint8_t seq_nr;                 /**< Next packets sequence number */
-    uint16_t radio_pan;             /**< The PAN the radio device is using */
+    uint8_t radio_pan[2];             /**< The PAN the radio device is using */
     uint8_t radio_channel;          /**< The channel the radio device is using */
     uint8_t addr_short[2];          /**< The short address the radio device is using */
     uint8_t addr_long[8];           /**< The long address the radio device is using */
