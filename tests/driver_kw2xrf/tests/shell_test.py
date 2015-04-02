@@ -32,7 +32,7 @@ try:
         print repr(i)
     ser.flushInput()
     time.sleep(.05)
-    
+
     ser.write('ifconfig 4 set channel 15\r\n')
     time.sleep(.05)
     ser.flushInput()
@@ -46,7 +46,7 @@ try:
         print repr(i)
     ser.flushInput()
     time.sleep(.05)
-    
+
     ser.write('ifconfig 4 set pan 06\r\n')
     time.sleep(.05)
     ser.flushInput()
@@ -74,7 +74,7 @@ try:
         print repr(i)
     ser.flushInput()
     time.sleep(.05)
-    
+
     ser.write('ifconfig 4 set power 100\r\n')
     time.sleep(.05)
     ser.flushInput()
@@ -103,7 +103,7 @@ try:
     ser.write('ifconfig 4 set state sleep\r\n')
     ser.flushInput()
     time.sleep(.05)
-    
+
     ser.write('ifconfig 4 set addr_long ff:ff:ff:aa:ff:ff:ff:dd\r\n')
     time.sleep(.05)
     ser.flushInput()
