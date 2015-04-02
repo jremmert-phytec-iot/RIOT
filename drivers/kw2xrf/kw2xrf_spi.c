@@ -64,6 +64,7 @@ int kw2xrf_spi_init(void)
     gpio_init_out(KW2XRF_CS_GPIO, GPIO_NOPULL);
     gpio_set(KW2XRF_CS_GPIO);
 #endif
+
     if (res < 0) {
         DEBUG("kw2xrf_spi_init: error initializing SPI_%i device (code %i)\n",
               spi_dev, res);
@@ -86,7 +87,7 @@ uint8_t kw2xrf_read_dreg(uint8_t addr)
     uint8_t value;
     kw2xrf_spi_transfer_head();
     spi_transfer_reg(KW2XRF_SPI, (addr | MKW2XDRF_REG_READ),
-                                  0x0, (char *)&value);
+                     0x0, (char *)&value);
     kw2xrf_spi_transfer_tail();
     return value;
 }
@@ -96,6 +97,7 @@ void kw2xrf_write_iregs(uint8_t addr, uint8_t *buf, uint8_t length)
     if (length > (KW2XRF_IBUF_LENGTH - 1)) {
         length = KW2XRF_IBUF_LENGTH - 1;
     }
+
     ibuf[0] = addr;
 
     for (uint8_t i = 0; i < length; i++) {
@@ -115,6 +117,7 @@ void kw2xrf_read_iregs(uint8_t addr, uint8_t *buf, uint8_t length)
     if (length > (KW2XRF_IBUF_LENGTH - 1)) {
         length = KW2XRF_IBUF_LENGTH - 1;
     }
+
     ibuf[0] = addr;
 
     kw2xrf_spi_transfer_head();
@@ -133,7 +136,7 @@ void kw2xrf_write_fifo(uint8_t *data, radio_packet_length_t length)
 {
     kw2xrf_spi_transfer_head();
     spi_transfer_regs(KW2XRF_SPI, MKW2XDRF_BUF_WRITE,
-                             (char *)data, NULL, length);
+                      (char *)data, NULL, length);
     kw2xrf_spi_transfer_tail();
 }
 
@@ -141,7 +144,7 @@ void kw2xrf_read_fifo(uint8_t *data, radio_packet_length_t length)
 {
     kw2xrf_spi_transfer_head();
     spi_transfer_regs(KW2XRF_SPI, MKW2XDRF_BUF_READ, NULL,
-                             (char *)data, length);
+                      (char *)data, length);
     kw2xrf_spi_transfer_tail();
 }
 /** @} */

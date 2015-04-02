@@ -32,13 +32,14 @@ extern "C" {
 
 /* Transceiver Sequence Selector, define Values for XCVSEQ */
 typedef enum {
-     XCVSEQ_IDLE = 0,
-     XCVSEQ_RECEIVE,
-     XCVSEQ_TRANSMIT,
-     XCVSEQ_CCA,
-     XCVSEQ_TX_RX,
-     XCVSEQ_CONTINUOUS_CCA,
-     } kw2xrf_physeq_t;
+    XCVSEQ_IDLE = 0,
+    XCVSEQ_RECEIVE,
+    XCVSEQ_TRANSMIT,
+    XCVSEQ_CCA,
+    XCVSEQ_TX_RX,
+    XCVSEQ_CONTINUOUS_CCA,
+}
+kw2xrf_physeq_t;
 
 enum mkw2xdrf_dregister {
     MKW2XDM_IRQSTS1 = 0x0,              /* Interrupt Request Status 1 */
