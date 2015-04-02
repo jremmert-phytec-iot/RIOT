@@ -90,6 +90,6 @@ int main(void)
     /* start the shell */
     shell_init(&shell, NULL, SHELL_BUFSIZE, shell_read, shell_put);
     shell_run(&shell);
-    
+
     return 0;
 }

@@ -1,21 +1,10 @@
-# netdev tests
-This application tests the module `netdev`, it's base module `netdev_base` in
-particular.
-The tests can be automated by running
+# About
+This is a manual test application for testing the KW2xrf network device driver.
 
-```bash
-SENDER=0 make all flash && SENDER=1 make all flash && make test
-```
+The kw2xrf radio-module is integrated in the same package with the CPU,
+therefore no external pin configuration except the common clock and
+power circuit is neccessary.
 
-The values of the network addresses, the channel, and the network ID can be
-configured by the environment variables
-
-* `NETDEV_TEST_RECEIVER` and `NETDEV_TEST_SENDER`,
-* `NETDEV_TEST_CHANNEL`,
-* `NETDEV_TEST_NID`
-
-You can set the role of the application by setting the `SENDER` variable to
-either 0 (application is receiver) or any other value (applictation is sender),
-but keep in mind, that both versions have to be flashed to to seperate devices
-(identified by `RECEIVER_PORT` and `SENDER_PORT` respectively) in order for
-`make test` to succeed.
+# Usage
+For testing the KW2xrf driver you can use the netif shell commands that are
+included in this application.
