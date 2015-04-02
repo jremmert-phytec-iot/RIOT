@@ -9,7 +9,8 @@
 /**
  * @defgroup    drivers_kw2xrf kw2x radio-driver
  * @ingroup     drivers
- * @brief       Device driver for the Freescale KW2xD radio
+ * @brief       Device driver for the Freescale KW2xD radio. Implements
+ *              exclusively the ng_netdev interface.
  * @{
  *
  * @file
@@ -77,11 +78,11 @@ extern "C" {
  */
 typedef struct {
     /* netdev fields */
-    ng_netdev_driver_t const *driver;     /**< pointer to the devices interface */
-    ng_netdev_event_cb_t event_cb;        /**< netdev event callback */
-    kernel_pid_t mac_pid;                 /**< the driver's thread's PID */
+    ng_netdev_driver_t const *driver;     /**< Pointer to the devices interface */
+    ng_netdev_event_cb_t event_cb;        /**< Netdev event callback */
+    kernel_pid_t mac_pid;                 /**< The driver's thread's PID */
     /* driver specific fields */
-    uint8_t buf[KW2XRF_MAX_PKT_LENGTH];
+    uint8_t buf[KW2XRF_MAX_PKT_LENGTH];   /**< Buffer for incoming or outgoing packets */
     ng_netconf_state_t state;             /**< Variable to keep radio driver's state */
     uint8_t seq_nr;                       /**< Next packets sequence number */
     uint8_t radio_pan[2];                 /**< The PAN the radio device is using */
