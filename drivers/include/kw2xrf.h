@@ -15,8 +15,8 @@
  * @file
  * @brief       Interface definition for the KW2xD device driver
  *
- * @author     Johann Fischer <j.fischer@phytec.de>
- * @author     Jonas Remmert <j.remmert@phytec.de>
+ * @author      Johann Fischer <j.fischer@phytec.de>
+ * @author      Jonas Remmert <j.remmert@phytec.de>
  */
 
 #ifndef MKW2XDRF_H_
@@ -45,7 +45,7 @@ extern "C" {
 /**
  * @brief   Default short address used after initialization
  */
-#define KW2XRF_DEFAULT_SHORT_ADDR     (0x0240)
+#define KW2XRF_DEFAULT_SHORT_ADDR     (0x0002)
 
 /**
  * @brief   Default PAN ID used after initialization
@@ -72,23 +72,25 @@ extern "C" {
  */
 #define MKW2XDRF_OUTPUT_POWER_MIN       (-35)
 
-/* Dummy definition for successfull build */
+/**
+ * @brief   KW2x device descriptor
+ */
 typedef struct {
     /* netdev fields */
     ng_netdev_driver_t const *driver;     /**< pointer to the devices interface */
-    ng_netdev_event_cb_t event_cb;  /**< netdev event callback */
-    kernel_pid_t mac_pid;           /**< the driver's thread's PID */
-    /* Devide driver specific fields */
+    ng_netdev_event_cb_t event_cb;        /**< netdev event callback */
+    kernel_pid_t mac_pid;                 /**< the driver's thread's PID */
+    /* driver specific fields */
     uint8_t buf[KW2XRF_MAX_PKT_LENGTH];
-    ng_netconf_state_t state;       /**< Variable to keep radio driver's state */
-    uint8_t seq_nr;                 /**< Next packets sequence number */
-    uint8_t radio_pan[2];             /**< The PAN the radio device is using */
-    uint8_t radio_channel;          /**< The channel the radio device is using */
-    uint8_t addr_short[2];          /**< The short address the radio device is using */
-    uint8_t addr_long[8];           /**< The long address the radio device is using */
-    uint8_t options;                /**< Bit field to save enable/disable options */
-    int8_t tx_power;
-    ng_nettype_t proto;             /**< Protocol the interface speaks */
+    ng_netconf_state_t state;             /**< Variable to keep radio driver's state */
+    uint8_t seq_nr;                       /**< Next packets sequence number */
+    uint8_t radio_pan[2];                 /**< The PAN the radio device is using */
+    uint8_t radio_channel;                /**< The channel the radio device is using */
+    uint8_t addr_short[2];                /**< The short address the radio device is using */
+    uint8_t addr_long[8];                 /**< The long address the radio device is using */
+    uint8_t options;                      /**< Bit field to save enable/disable options */
+    int8_t tx_power;                      /**< The current tx-power setting of the device */
+    ng_nettype_t proto;                   /**< Protocol the interface speaks */
 } kw2xrf_t;
 
 /**
