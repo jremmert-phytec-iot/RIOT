@@ -138,7 +138,7 @@ void _set_sequence(kw2xrf_physeq_t seq)
         /* abort any ongoing sequence */
         DEBUG("tx: abort SEQ_STATE: %x\n", kw2xrf_read_dreg(MKW2XDM_SEQ_STATE));
         kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
-    	while (kw2xrf_read_dreg(MKW2XDM_SEQ_STATE));
+        while (kw2xrf_read_dreg(MKW2XDM_SEQ_STATE));
 
         /* Clear all pending interrupts */
         kw2xrf_write_dreg(MKW2XDM_IRQSTS1, 0x7f);
