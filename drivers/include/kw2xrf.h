@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 /**
- * @brief   Maximum packet length, including XBee API frame overhead
+ * @brief   Maximum packet length
  */
 #define KW2XRF_MAX_PKT_LENGTH         (127U)
 
@@ -58,6 +58,11 @@ extern "C" {
 #define KW2XRF_DEFAULT_CHANNEL        (13U)
 
 /**
+ * @brief   Default TX_POWER in dbm used after initialization
+ */
+#define KW2XRF_DEFAULT_TX_POWER        (0)
+
+/**
  * @brief   Maximum output power of the kw2x device in dBm
  */
 #define MKW2XDRF_OUTPUT_POWER_MAX  8
@@ -72,18 +77,19 @@ extern "C" {
  */
 typedef struct {
     /* netdev fields */
-    ng_netdev_driver_t const *driver;     /**< pointer to the devices interface */
-    ng_netdev_event_cb_t event_cb;        /**< netdev event callback */
-    kernel_pid_t mac_pid;                 /**< the driver's thread's PID */
-    /* Devide driver specific fields */
-    uint8_t buf[KW2XRF_MAX_PKT_LENGTH];   /**< Buffer for the kw2x radio device */
+    ng_netdev_driver_t const *driver;     /**< Pointer to the devices interface */
+    ng_netdev_event_cb_t event_cb;        /**< Netdev event callback */
+    kernel_pid_t mac_pid;                 /**< The driver's thread's PID */
+    /* driver specific fields */
+    uint8_t buf[KW2XRF_MAX_PKT_LENGTH];   /**< Buffer for incoming or outgoing packets */
     ng_netconf_state_t state;             /**< Variable to keep radio driver's state */
     uint8_t seq_nr;                       /**< Next packets sequence number */
-    uint16_t radio_pan;                   /**< The PAN the radio device is using */
+    uint8_t radio_pan[2];                 /**< The PAN the radio device is using */
     uint8_t radio_channel;                /**< The channel the radio device is using */
     uint8_t addr_short[2];                /**< The short address the radio device is using */
     uint8_t addr_long[8];                 /**< The long address the radio device is using */
     uint8_t options;                      /**< Bit field to save enable/disable options */
+    int8_t tx_power;                      /**< The current tx-power setting of the device */
     ng_nettype_t proto;                   /**< Protocol the interface speaks */
 } kw2xrf_t;
 
