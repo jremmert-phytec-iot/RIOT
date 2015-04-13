@@ -24,7 +24,7 @@
 #include "net/ng_nomac.h"
 #include "net/ng_netbase.h"
 
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG    (1)
 #include "debug.h"
 
 /**
@@ -59,6 +59,26 @@ static void _event_cb(ng_netdev_event_t event, void *data)
             sendto = ng_netreg_getnext(sendto);
         }
     }
+}
+
+int _mlme_scan(ng_netdev_t *dev, ng_netconf_mlme_attributes_t *param)
+{
+    //msg_t msg;
+    int res = 0;
+
+    DEBUG("802154_mac: mlme scan\n");
+
+    /* Iterate through all requested channels */
+    for(int i = 0; i<MAX_CHANNELS; i++) {
+        if(param->scan_channels[i]) {
+            res = dev->driver->set(dev, NETCONF_OPT_CHANNEL, &(param->scan_channels[i]), 1);
+            DEBUG("802154_mac: Channel %i scanned\n", param->scan_channels[i]);
+            if(res < 0) {
+                DEBUG("802154_mac: Error when scanning channel, returned %i\n", res);
+            }
+            }
+    }
+    return 0;
 }
 
 /**
@@ -103,17 +123,11 @@ static void *_nomac_thread(void *args)
                 DEBUG("nomac: NG_NETAPI_MSG_TYPE_SET received\n");
                 /* read incoming options */
                 opt = (ng_netapi_opt_t *)msg.content.ptr;
-                if(opt == NETCONF_OPT_MLME_SCAN) {
-                    res = _mlme_scan();
-                    reply.type = NG_NETAPI_MSG_TYPE_ACK;
-                }
-                else {
-                    /* set option for device driver */
-                    res = dev->driver->set(dev, opt->opt, opt->data, opt->data_len);
-                    DEBUG("nomac: response of netdev->set: %i\n", res);
-                    /* send reply to calling thread */
-                    reply.type = NG_NETAPI_MSG_TYPE_ACK;
-                }
+                /* set option for device driver */
+                res = dev->driver->set(dev, opt->opt, opt->data, opt->data_len);
+                DEBUG("nomac: response of netdev->set: %i\n", res);
+                /* send reply to calling thread */
+                reply.type = NG_NETAPI_MSG_TYPE_ACK;
                 reply.content.value = (uint32_t)res;
                 msg_reply(&msg, &reply);
                 break;
@@ -124,11 +138,18 @@ static void *_nomac_thread(void *args)
                 /* read incoming options */
                 opt = (ng_netapi_opt_t *)msg.content.ptr;
                 /* get option from device driver */
-                res = dev->driver->get(dev, opt->opt, opt->data, opt->data_len);
-                DEBUG("nomac: response of netdev->get: %i\n", res);
-                /* send reply to calling thread */
-                reply.type = NG_NETAPI_MSG_TYPE_ACK;
-                reply.content.value = (uint32_t)res;
+                if(opt->opt == NETCONF_OPT_MLME_SCAN) {
+                    res = _mlme_scan(dev, (ng_netconf_mlme_attributes_t *)opt->data);
+                    reply.type = NG_NETAPI_MSG_TYPE_ACK;
+                    reply.content.value = (uint32_t)res;
+                }
+                else {
+                    res = dev->driver->get(dev, opt->opt, opt->data, opt->data_len);
+                    DEBUG("nomac: response of netdev->get: %i\n", res);
+                    /* send reply to calling thread */
+                    reply.type = NG_NETAPI_MSG_TYPE_ACK;
+                    reply.content.value = (uint32_t)res;
+                }
                 msg_reply(&msg, &reply);
                 break;
             default:

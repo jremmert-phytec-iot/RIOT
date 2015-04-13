@@ -22,6 +22,8 @@
 #ifndef NG_NET_CONF_H_
 #define NG_NET_CONF_H_
 
+#define MAX_CHANNELS 15
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -78,7 +80,10 @@ typedef enum {
     NETCONF_OPT_RAWMODE,            /**< en/disable the pre-processing of data
                                          in a network device driver as type
                                          ng_nettype_t */
-    /* add more options if needed */
+    NETCONF_OPT_MLME_SCAN,          /**< scans channels for PAN coordinator, based
+                                     *   on a given list of parameters */
+    
+/* add more options if needed */
 } ng_netconf_opt_t;
 
 /**
@@ -110,6 +115,13 @@ typedef enum {
                                      *   state of the network device is *NETCONF_STATE_IDLE* */
     /* add other states if needed */
 } ng_netconf_state_t;
+
+typedef enum {
+    ED = 0,          /**< ED channel scan, refer 5.1.2.1.1 IEEE802.15.4-2011 */
+    ACTIVE,          /**< ACTIVE channel scan, refer 5.1.2.1.2 IEEE802.15.4-2011 */
+    PASSIVE,         /**< PASSIVE channel scan, refer 5.1.2.1.2 IEEE802.15.4-2011 */
+    ORPHAN,          /**< ORPHAN channel scan, refer 5.1.2.1.3 IEEE802.15.4-2011 */
+} ng_netconf_scan_type_t;
 
 #ifdef __cplusplus
 }

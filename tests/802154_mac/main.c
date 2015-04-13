@@ -26,7 +26,7 @@
 #include "net/ng_pktdump.h"
 #include "net/802154_mac.h"
 
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG    (1)
 #include "debug.h"
 
 #define SHELL_BUFSIZE   (UART0_BUFSIZE)
@@ -54,6 +54,7 @@ int main(void)
     int res;
     shell_t shell;
     ng_netreg_entry_t dump;
+    ng_netconf_mlme_attributes_t mlme;
 
     puts("kw2xrf device driver test");
 
@@ -94,6 +95,15 @@ int main(void)
         puts("Error registering network device with netif");
         return -1;
     }
+
+    for(int i = 0; i< MAX_CHANNELS; i++) {
+        mlme.scan_channels[i] = 0;
+    }
+    mlme.scan_channels[1] = 13;
+
+    res = ng_netapi_get(iface, NETCONF_OPT_MLME_SCAN, 0, &mlme, sizeof(ng_netconf_mlme_attributes_t));
+    DEBUG("802154_mac: scan returned %i\n", res);
+
 
     /* start the shell */
     shell_init(&shell, NULL, SHELL_BUFSIZE, shell_read, shell_put);
