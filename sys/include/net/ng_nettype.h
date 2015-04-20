@@ -48,6 +48,8 @@ typedef enum {
     NG_NETTYPE_SIXLOWPAN,       /**< Protocol is 6LoWPAN */
 #endif
 
+    NG_NETTYPE_802154,          /**< Protocol is 802.15.4 */
+
     /**
      * @{
      * @name Network layer

@@ -7,5 +7,6 @@ USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += kw2xrf
 USEMODULE += vtimer
+USEMODULE += ieee802154
 
 include $(RIOTBASE)/Makefile.include

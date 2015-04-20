@@ -23,6 +23,8 @@
 #include "thread.h"
 #include "net/ng_nomac.h"
 #include "net/ng_netbase.h"
+#include "net/ng_netif.h"
+#include "net/ieee802154_frame.h"
 
 #define ENABLE_DEBUG    (1)
 #include "debug.h"
@@ -78,6 +80,81 @@ int _mlme_scan(ng_netdev_t *dev, ng_netconf_mlme_attributes_t *param)
             }
             }
     }
+    return 0;
+}
+
+/* The association to a pan coordinator is described in 5.1.3.1 IEEE802.15.4 Standard */
+int _mlme_associate(ng_netdev_t *dev, ng_netconf_mlme_attributes_t *param)
+{
+    int res = 0;
+    uint8_t send_content[] = "test";
+    ieee802154_frame_type_t type;
+
+    DEBUG("802154_mac: mlme associate\n");
+
+    /* set channel */
+    res = dev->driver->set(dev, NETCONF_OPT_CHANNEL,
+        &(param->channel_number), sizeof(param->channel_number));
+
+    /* set channel */
+    res = dev->driver->set(dev, NETCONF_OPT_NID, &(param->coord_pan_id), 2);
+
+    /* set addr */
+    //ng_netif_hdr_t ng_netif_hdr;
+    //ng_netif_hdr_t *nethdr = &ng_netif_hdr;
+    //ng_netif_hdr_init(nethdr, 2, 2);
+    //ng_netif_hdr_set_dst_addr(nethdr, &(param->coord_address[0]), 2);
+
+
+typedef struct __attribute__((packed)) {
+    ieee802154_frame_type_t frame_type;
+    uint8_t sec_enb;
+    uint8_t frame_pend;
+    uint8_t ack_req;
+    uint8_t panid_comp;
+    uint8_t dest_addr_m;
+    uint8_t frame_ver;
+    uint8_t src_addr_m;
+} ieee802154_frame_fcf_frame_t;
+
+typedef struct __attribute__((packed)) {
+    ieee802154_frame_fcf_frame_t fcf;
+    uint8_t seq_nr;
+    uint16_t dest_pan_id;
+    uint8_t dest_addr[8];
+    uint16_t src_pan_id;
+    uint8_t src_addr[8];
+    uint8_t *payload;
+    uint8_t payload_len;
+} ieee802154_frame_t;
+    ieee802154_frame_t ng_802154_hdr;
+
+    /* Basic initialization for testing */
+    type = IEEE_802154_DATA_FRAME;
+    ng_802154_hdr.fcf.frame_type = type;
+    ng_802154_hdr.fcf.sec_enb = 0;
+    ng_802154_hdr.fcf.frame_pend = 0;
+    ng_802154_hdr.fcf.ack_req = 0;
+    ng_802154_hdr.fcf.panid_comp = 0;
+    ng_802154_hdr.fcf.dest_addr_m = 2; /* short addr mode */
+    ng_802154_hdr.fcf.frame_ver = 1; /* 802154 frame */
+    ng_802154_hdr.fcf.src_addr_m = 2; /* short addr mode */
+
+    ng_802154_hdr.dest_pan_id = 0x0001;
+    ng_802154_hdr.dest_addr[0] = 0x01;
+    ng_802154_hdr.dest_addr[1] = 0x00;
+
+    ieee802154_frame_t *hdr_802154 = &ng_802154_hdr;
+
+    ng_pktsnip_t *pkt;
+
+    //pkt = ng_pktbuf_add(NULL, send_content, sizeof(send_content), NG_NETTYPE_UNDEF);
+    pkt = ng_pktbuf_add(NULL, hdr_802154, sizeof(ieee802154_frame_t *),
+                            NG_NETTYPE_802154);
+    //pkt = ng_pktbuf_add(NULL, nethdr, sizeof(ng_netif_hdr_t),
+    //                        NG_NETTYPE_UNDEF);
+
+    dev->driver->send_data(dev, pkt);
     return 0;
 }
 
@@ -140,6 +217,11 @@ static void *_nomac_thread(void *args)
                 /* get option from device driver */
                 if(opt->opt == NETCONF_OPT_MLME_SCAN) {
                     res = _mlme_scan(dev, (ng_netconf_mlme_attributes_t *)opt->data);
+                    reply.type = NG_NETAPI_MSG_TYPE_ACK;
+                    reply.content.value = (uint32_t)res;
+                }
+                if(opt->opt == NETCONF_OPT_MLME_ASSOCIATE) {
+                    res = _mlme_associate(dev, (ng_netconf_mlme_attributes_t *)opt->data);
                     reply.type = NG_NETAPI_MSG_TYPE_ACK;
                     reply.content.value = (uint32_t)res;
                 }

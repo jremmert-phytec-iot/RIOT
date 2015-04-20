@@ -82,8 +82,9 @@ typedef enum {
                                          ng_nettype_t */
     NETCONF_OPT_MLME_SCAN,          /**< scans channels for PAN coordinator, based
                                      *   on a given list of parameters */
-    
-/* add more options if needed */
+    NETCONF_OPT_MLME_ASSOCIATE,     /**< connects to an pan, based
+                                     *   on a given list of parameters */
+    /* add more options if needed */
 } ng_netconf_opt_t;
 
 /**
@@ -123,9 +124,24 @@ typedef enum {
     ORPHAN,          /**< ORPHAN channel scan, refer 5.1.2.1.3 IEEE802.15.4-2011 */
 } ng_netconf_scan_type_t;
 
-#ifdef __cplusplus
-}
-#endif
+/**
+ * @brief   TODO: Adapt description: Option parameter to be used with @ref NETCONF_OPT_STATE to set or get
+ *          the state of a network device or protocol implementation
+ */
+typedef struct {
+    ng_netconf_scan_type_t scan_type;
+    int8_t scan_channels[MAX_CHANNELS];      /**< for now we can choose 11-26, -1 to not scan a channel */
+    uint8_t scan_duration;          /**< value 0-14, duration: aBaseSuperframeDuration * (2^n + 1) */
+    uint8_t channel_page;           /**< TODO: */
+    uint16_t channel_number;         /**< TODO: */
+    uint8_t security_level;
+    uint8_t key_id_mode;
+    uint8_t key_source[8];
+    uint8_t key_index;
+    uint8_t coord_pan_id[2];           /* pan_id of network to associate with */
+    uint8_t coord_address[8];           /* addr of the network coordinator associate with */
+    uint8_t capability_information;  /* capability information field, refer 5.3.1.2 IEEE802.15.4-2011 */
+} ng_netconf_mlme_attributes_t;
 
 #endif /* NG_NET_CONF_H_ */
 /** @} */

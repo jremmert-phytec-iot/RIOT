@@ -25,6 +25,7 @@
 #include "net/ng_netbase.h"
 #include "net/ng_pktdump.h"
 #include "net/802154_mac.h"
+#include "net/ng_netif.h"
 
 #define ENABLE_DEBUG    (1)
 #include "debug.h"
@@ -100,11 +101,19 @@ int main(void)
         mlme.scan_channels[i] = 0;
     }
     mlme.scan_channels[1] = 13;
+    mlme.coord_pan_id[0] = 0x01;
+    mlme.coord_pan_id[1] = 0x00;
+    mlme.coord_address[0] = 0x01;
+    mlme.coord_address[1] = 0x00;
+    mlme.channel_number = 19;
 
-    res = ng_netapi_get(iface, NETCONF_OPT_MLME_SCAN, 0, &mlme, sizeof(ng_netconf_mlme_attributes_t));
-    DEBUG("802154_mac: scan returned %i\n", res);
+    //res = ng_netapi_get(iface, NETCONF_OPT_MLME_SCAN, 0, &mlme, sizeof(ng_netconf_mlme_attributes_t));
+    //DEBUG("802154_mac: scan returned %i\n", res);
 
+    res = ng_netapi_get(iface, NETCONF_OPT_MLME_ASSOCIATE, 0, &mlme, sizeof(ng_netconf_mlme_attributes_t));
+    DEBUG("802154_mac: associate returned %i\n", res);
 
+    
     /* start the shell */
     shell_init(&shell, NULL, SHELL_BUFSIZE, shell_read, shell_put);
     shell_run(&shell);
