@@ -26,8 +26,18 @@
 #include "net/ng_netif.h"
 #include "net/ieee802154_frame.h"
 
-#define ENABLE_DEBUG    (1)
+#define ENABLE_DEBUG    (0)
+#define INTERNAL_MSG_QUEUE_SIZE 100
 #include "debug.h"
+typedef enum {
+        IDLE,
+        WAIT,
+        ASSOCIATE,
+    } mac_states_t;
+
+static mac_states_t mac_state = IDLE;
+static msg_t internal_msg_queue[INTERNAL_MSG_QUEUE_SIZE];
+static int internal_msg_queue_index;
 
 /**
  * @brief   Function called by the device driver on device events
@@ -61,11 +71,17 @@ static void _event_cb(ng_netdev_event_t event, void *data)
             sendto = ng_netreg_getnext(sendto);
         }
     }
+    /* RAW-data-frame, MAC-layer has to process it*/
+    if (event == NETDEV_EVENT_RX_COMPLETE) {
+        DEBUG("802154 MAC: Raw Pkt received \n");
+        ng_pktsnip_t *pkt;
+        pkt = (ng_pktsnip_t *)data;
+    /* What to do with packet now? */
+    }
 }
 
 int _mlme_scan(ng_netdev_t *dev, ng_netconf_mlme_attributes_t *param)
 {
-    //msg_t msg;
     int res = 0;
 
     DEBUG("802154_mac: mlme scan\n");
@@ -87,8 +103,9 @@ int _mlme_scan(ng_netdev_t *dev, ng_netconf_mlme_attributes_t *param)
 int _mlme_associate(ng_netdev_t *dev, ng_netconf_mlme_attributes_t *param)
 {
     int res = 0;
-    uint8_t send_content[] = "test";
     ieee802154_frame_type_t type;
+    uint8_t frame_buf[127];
+    ng_pktsnip_t *pkt;
 
     DEBUG("802154_mac: mlme associate\n");
 
@@ -96,61 +113,33 @@ int _mlme_associate(ng_netdev_t *dev, ng_netconf_mlme_attributes_t *param)
     res = dev->driver->set(dev, NETCONF_OPT_CHANNEL,
         &(param->channel_number), sizeof(param->channel_number));
 
-    /* set channel */
+    /* set NID */
     res = dev->driver->set(dev, NETCONF_OPT_NID, &(param->coord_pan_id), 2);
 
-    /* set addr */
-    //ng_netif_hdr_t ng_netif_hdr;
-    //ng_netif_hdr_t *nethdr = &ng_netif_hdr;
-    //ng_netif_hdr_init(nethdr, 2, 2);
-    //ng_netif_hdr_set_dst_addr(nethdr, &(param->coord_address[0]), 2);
-
-
-typedef struct __attribute__((packed)) {
-    ieee802154_frame_type_t frame_type;
-    uint8_t sec_enb;
-    uint8_t frame_pend;
-    uint8_t ack_req;
-    uint8_t panid_comp;
-    uint8_t dest_addr_m;
-    uint8_t frame_ver;
-    uint8_t src_addr_m;
-} ieee802154_frame_fcf_frame_t;
-
-typedef struct __attribute__((packed)) {
-    ieee802154_frame_fcf_frame_t fcf;
-    uint8_t seq_nr;
-    uint16_t dest_pan_id;
-    uint8_t dest_addr[8];
-    uint16_t src_pan_id;
-    uint8_t src_addr[8];
-    uint8_t *payload;
-    uint8_t payload_len;
-} ieee802154_frame_t;
     ieee802154_frame_t ng_802154_hdr;
 
     /* Basic initialization for testing */
-    type = IEEE_802154_DATA_FRAME;
+    type = IEEE_802154_MAC_CMD_FRAME;
     ng_802154_hdr.fcf.frame_type = type;
     ng_802154_hdr.fcf.sec_enb = 0;
     ng_802154_hdr.fcf.frame_pend = 0;
     ng_802154_hdr.fcf.ack_req = 0;
     ng_802154_hdr.fcf.panid_comp = 0;
-    ng_802154_hdr.fcf.dest_addr_m = 2; /* short addr mode */
-    ng_802154_hdr.fcf.frame_ver = 1; /* 802154 frame */
-    ng_802154_hdr.fcf.src_addr_m = 2; /* short addr mode */
+    ng_802154_hdr.fcf.dest_addr_m = 2;  /* short addr mode */
+    ng_802154_hdr.fcf.frame_ver = 1;    /* 802154 2006 frame, 0 for 2003 version */
+    ng_802154_hdr.fcf.src_addr_m = 2;   /* short addr mode */
 
-    ng_802154_hdr.dest_pan_id = 0x0001;
-    ng_802154_hdr.dest_addr[0] = 0x01;
-    ng_802154_hdr.dest_addr[1] = 0x00;
+    ng_802154_hdr.dest_pan_id = 0xffff;
+    ng_802154_hdr.dest_addr[0] = 0xca;  /* Fill in here the address of the received beacon */
+    ng_802154_hdr.dest_addr[1] = 0xfe;
 
-    ieee802154_frame_t *hdr_802154 = &ng_802154_hdr;
+    ieee802154_frame_print_fcf_frame(&ng_802154_hdr);
+    uint8_t hdr_size = ieee802154_frame_get_hdr_len(&ng_802154_hdr);
+    ieee802154_frame_init(&ng_802154_hdr, frame_buf);
 
-    ng_pktsnip_t *pkt;
-
+    printf("size frame: %i\n", hdr_size);
     //pkt = ng_pktbuf_add(NULL, send_content, sizeof(send_content), NG_NETTYPE_UNDEF);
-    pkt = ng_pktbuf_add(NULL, hdr_802154, sizeof(ieee802154_frame_t *),
-                            NG_NETTYPE_802154);
+    pkt = ng_pktbuf_add(NULL, frame_buf, hdr_size, NG_NETTYPE_802154);
     //pkt = ng_pktbuf_add(NULL, nethdr, sizeof(ng_netif_hdr_t),
     //                        NG_NETTYPE_UNDEF);
 
@@ -179,11 +168,21 @@ static void *_nomac_thread(void *args)
     ng_netif_add(dev->mac_pid);
     /* register the event callback with the device driver */
     dev->driver->add_event_callback(dev, _event_cb);
+    /* Activate RAW-Receive mode */
+    bool tmp = NETCONF_ENABLE;
+    res = dev->driver->set(dev, NETCONF_OPT_RAWMODE,
+        &tmp, sizeof(ng_netconf_enable_t));
 
     /* start the event loop */
     while (1) {
         DEBUG("nomac: waiting for incoming messages\n");
-        msg_receive(&msg);
+        if((mac_state == IDLE) && (internal_msg_queue_index !=0)) {
+            msg = internal_msg_queue[internal_msg_queue_index];
+            internal_msg_queue_index--;
+            }
+        else {
+            msg_receive(&msg);
+            }
         /* dispatch NETDEV and NETAPI messages */
         switch (msg.type) {
             case NG_NETDEV_MSG_TYPE_EVENT:
@@ -192,7 +191,17 @@ static void *_nomac_thread(void *args)
                 break;
             case NG_NETAPI_MSG_TYPE_SND:
                 DEBUG("nomac: NG_NETAPI_MSG_TYPE_SND received\n");
-                dev->driver->send_data(dev, (ng_pktsnip_t *)msg.content.ptr);
+                if(mac_state == IDLE) {
+                    dev->driver->send_data(dev, (ng_pktsnip_t *)msg.content.ptr);
+                }
+                /* MAC layer is currently busy, or waits for events, queue incoming requests */
+                if(internal_msg_queue_index < INTERNAL_MSG_QUEUE_SIZE) {
+                    internal_msg_queue_index++;
+                    internal_msg_queue[internal_msg_queue_index] = msg;
+                }
+                else {
+                    DEBUG("802154_mac: error internal queue full\n");
+                }
                 break;
             case NG_NETAPI_MSG_TYPE_SET:
                 /* TODO: filter out MAC layer options -> for now forward

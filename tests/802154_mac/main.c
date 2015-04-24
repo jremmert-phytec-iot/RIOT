@@ -35,7 +35,7 @@
 /**
  * @brief   Stack for the nomac thread
  */
-static char nomac_stack[KERNEL_CONF_STACKSIZE_DEFAULT];
+static char nomac_stack[KERNEL_CONF_STACKSIZE_DEFAULT + KERNEL_CONF_STACKSIZE_PRINTF];
 
 static kw2xrf_t dev;
 
@@ -58,9 +58,6 @@ int main(void)
     ng_netconf_mlme_attributes_t mlme;
 
     puts("kw2xrf device driver test");
-
-    /* initialize network module(s) */
-    ng_netif_init();
 
     dump.pid = ng_pktdump_init();
 
@@ -91,7 +88,6 @@ int main(void)
 
     /* register network device */
     res = ng_netif_add(iface);
-
     if (res < 0) {
         puts("Error registering network device with netif");
         return -1;
@@ -101,11 +97,9 @@ int main(void)
         mlme.scan_channels[i] = 0;
     }
     mlme.scan_channels[1] = 13;
-    mlme.coord_pan_id[0] = 0x01;
-    mlme.coord_pan_id[1] = 0x00;
-    mlme.coord_address[0] = 0x01;
-    mlme.coord_address[1] = 0x00;
-    mlme.channel_number = 19;
+    mlme.coord_pan_id = 0x0001;
+    mlme.coord_address = 0x0001;
+    mlme.channel_number = 11;
 
     //res = ng_netapi_get(iface, NETCONF_OPT_MLME_SCAN, 0, &mlme, sizeof(ng_netconf_mlme_attributes_t));
     //DEBUG("802154_mac: scan returned %i\n", res);

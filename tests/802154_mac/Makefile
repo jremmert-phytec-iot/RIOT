@@ -8,5 +8,8 @@ USEMODULE += shell_commands
 USEMODULE += kw2xrf
 USEMODULE += vtimer
 USEMODULE += ieee802154
+USEMODULE += ps
+
+CFLAGS += -DDEVELHELP
 
 include $(RIOTBASE)/Makefile.include

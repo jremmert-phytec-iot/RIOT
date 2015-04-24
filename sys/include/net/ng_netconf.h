@@ -136,10 +136,10 @@ typedef struct {
     uint16_t channel_number;         /**< TODO: */
     uint8_t security_level;
     uint8_t key_id_mode;
-    uint8_t key_source[8];
+    uint8_t key_source;
     uint8_t key_index;
-    uint8_t coord_pan_id[2];           /* pan_id of network to associate with */
-    uint8_t coord_address[8];           /* addr of the network coordinator associate with */
+    uint16_t coord_pan_id;           /* pan_id of network to associate with */
+    uint64_t coord_address;           /* addr of the network coordinator associate with */
     uint8_t capability_information;  /* capability information field, refer 5.3.1.2 IEEE802.15.4-2011 */
 } ng_netconf_mlme_attributes_t;
 

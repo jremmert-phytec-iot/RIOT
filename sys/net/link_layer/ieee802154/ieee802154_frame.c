@@ -59,19 +59,19 @@ uint8_t ieee802154_frame_init(ieee802154_frame_t *frame, uint8_t *buf)
 
     /* Destination Address - 802.15.4 - 2006 - 7.2.1.4 */
     if (frame->fcf.dest_addr_m == 0x02) {
-        buf[index]     = frame->dest_addr[1];
-        buf[index + 1] = frame->dest_addr[0];
+        buf[index]     = frame->dest_addr[0];
+        buf[index + 1] = frame->dest_addr[1];
         index += 2;
     }
     else if (frame->fcf.dest_addr_m == 0x03) {
-        buf[index]     = frame->dest_addr[7];
-        buf[index + 1] = frame->dest_addr[6];
-        buf[index + 2] = frame->dest_addr[5];
-        buf[index + 3] = frame->dest_addr[4];
-        buf[index + 4] = frame->dest_addr[3];
-        buf[index + 5] = frame->dest_addr[2];
-        buf[index + 6] = frame->dest_addr[1];
-        buf[index + 7] = frame->dest_addr[0];
+        buf[index]     = frame->dest_addr[0];
+        buf[index + 1] = frame->dest_addr[1];
+        buf[index + 2] = frame->dest_addr[2];
+        buf[index + 3] = frame->dest_addr[3];
+        buf[index + 4] = frame->dest_addr[4];
+        buf[index + 5] = frame->dest_addr[5];
+        buf[index + 6] = frame->dest_addr[6];
+        buf[index + 7] = frame->dest_addr[7];
         index += 8;
     }
 
@@ -86,19 +86,19 @@ uint8_t ieee802154_frame_init(ieee802154_frame_t *frame, uint8_t *buf)
 
     /* Source Address field - 802.15.4 - 2006 - 7.2.1.6 */
     if (frame->fcf.src_addr_m == 0x02) {
-        buf[index]     = frame->src_addr[1];
-        buf[index + 1] = frame->src_addr[0];
+        buf[index]     = frame->src_addr[0];
+        buf[index + 1] = frame->src_addr[1];
         index += 2;
     }
     else if (frame->fcf.src_addr_m == 0x03) {
-        buf[index]     = frame->src_addr[7];
-        buf[index + 1] = frame->src_addr[6];
-        buf[index + 2] = frame->src_addr[5];
-        buf[index + 3] = frame->src_addr[4];
-        buf[index + 4] = frame->src_addr[3];
-        buf[index + 5] = frame->src_addr[2];
-        buf[index + 6] = frame->src_addr[1];
-        buf[index + 7] = frame->src_addr[0];
+        buf[index]     = frame->src_addr[0];
+        buf[index + 1] = frame->src_addr[1];
+        buf[index + 2] = frame->src_addr[2];
+        buf[index + 3] = frame->src_addr[3];
+        buf[index + 4] = frame->src_addr[4];
+        buf[index + 5] = frame->src_addr[5];
+        buf[index + 6] = frame->src_addr[6];
+        buf[index + 7] = frame->src_addr[7];
         index += 8;
     }
 
