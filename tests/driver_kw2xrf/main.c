@@ -21,6 +21,7 @@
 #include "kernel.h"
 #include "shell.h"
 #include "shell_commands.h"
+#include "posix_io.h"
 #include "kw2xrf.h"
 #include "net/ng_netbase.h"
 #include "net/ng_nomac.h"
@@ -34,7 +35,7 @@
 /**
  * @brief   Stack for the nomac thread
  */
-static char nomac_stack[KERNEL_CONF_STACKSIZE_DEFAULT];
+static char nomac_stack[KERNEL_CONF_STACKSIZE_DEFAULT + KERNEL_CONF_STACKSIZE_PRINTF];
 
 static kw2xrf_t dev;
 

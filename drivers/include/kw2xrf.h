@@ -55,7 +55,7 @@ extern "C" {
 /**
  * @brief   Default channel used after initialization
  */
-#define KW2XRF_DEFAULT_CHANNEL        (13U)
+#define KW2XRF_DEFAULT_CHANNEL        (11U)
 
 /**
  * @brief   Default TX_POWER in dbm used after initialization
@@ -73,6 +73,21 @@ extern "C" {
 #define MKW2XDRF_OUTPUT_POWER_MIN  (-35)
 
 /**
+ * @brief   Internal device options
+ */
+typedef enum {
+    OPT_AUTOACK         = 0x0001,
+    OPT_CSMA            = 0x0002,
+    OPT_PROMISCUOUS     = 0x0004,
+    OPT_PRELOADING      = 0x0008,
+    OPT_TELL_TX_START   = 0x0010,
+    OPT_TELL_TX_END     = 0x0020,
+    OPT_TELL_RX_START   = 0x0040,
+    OPT_TELL_RX_END     = 0x0080,
+    OPT_RAWDUMP         = 0x0100,
+} kw2xrf_opt_t;
+
+/**
  * @brief   kw2xrf device descriptor
  */
 typedef struct {
@@ -84,11 +99,11 @@ typedef struct {
     uint8_t buf[KW2XRF_MAX_PKT_LENGTH];   /**< Buffer for incoming or outgoing packets */
     ng_netconf_state_t state;             /**< Variable to keep radio driver's state */
     uint8_t seq_nr;                       /**< Next packets sequence number */
-    uint8_t radio_pan[2];                 /**< The PAN the radio device is using */
+    uint16_t radio_pan;                   /**< The PAN the radio device is using */
     uint8_t radio_channel;                /**< The channel the radio device is using */
-    uint8_t addr_short[2];                /**< The short address the radio device is using */
-    uint8_t addr_long[8];                 /**< The long address the radio device is using */
-    uint8_t options;                      /**< Bit field to save enable/disable options */
+    uint16_t addr_short;                  /**< The short address the radio device is using */
+    uint64_t addr_long;                   /**< The long address the radio device is using */
+    uint16_t option;                      /**< Bit field to save enable/disable options */
     int8_t tx_power;                      /**< The current tx-power setting of the device */
     ng_nettype_t proto;                   /**< Protocol the interface speaks */
 } kw2xrf_t;
@@ -98,7 +113,7 @@ typedef struct {
  *
  * @param[out] dev          KW2XRF device to initialize
  *
- * @return                  0 on success
+ * @return                  -2 on success
  * @return                  -ENODEV on invalid device descriptor
  */
 int kw2xrf_init(kw2xrf_t *dev);
