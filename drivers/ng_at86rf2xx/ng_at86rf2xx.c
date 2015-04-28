@@ -156,6 +156,24 @@ void ng_at86rf2xx_reset(ng_at86rf2xx_t *dev)
     ng_at86rf2xx_reg_write(dev, NG_AT86RF2XX_REG__IRQ_MASK,
                            (NG_AT86RF2XX_IRQ_STATUS_MASK__RX_START |
                             NG_AT86RF2XX_IRQ_STATUS_MASK__TRX_END));
+    
+    /* Enable TOF measurement */
+    tmp = ng_at86rf2xx_reg_read(dev, NG_AT86RF2XX_REG__TRX_CTRL_0);
+    tmp |= NG_AT86RF2XX_TRX_CTRL_0_MASK__TOM_EN;
+    ng_at86rf2xx_reg_write(dev, NG_AT86RF2XX_REG__TRX_CTRL_0, tmp);
+    /* Enable Auto ACK, needed for TOF */
+    tmp = ng_at86rf2xx_reg_read(dev, NG_AT86RF2XX_REG__CSMA_SEED_1);
+    tmp &= ~(NG_AT86RF2XX_CSMA_SEED_1__AACK_DIS_ACK);
+    ng_at86rf2xx_reg_write(dev, NG_AT86RF2XX_REG__CSMA_SEED_1, tmp);
+    /* Enable synchronization point correction (SPC) for TOF */
+    tmp = ng_at86rf2xx_reg_read(dev, NG_AT86RF2XX_REG__XAH_CTRL_1);
+    tmp |= NG_AT86RF2XX_XAH_CTRL_1__AACK_SPC_EN;
+    ng_at86rf2xx_reg_write(dev, NG_AT86RF2XX_REG__XAH_CTRL_1, tmp);
+    /* Enable PHASE measurement unit */
+    tmp = ng_at86rf2xx_reg_read(dev, NG_AT86RF2XX_REG__TRX_CTRL_0);
+    tmp |= NG_AT86RF2XX_TRX_CTRL_0_PMU_EN;
+    ng_at86rf2xx_reg_write(dev, NG_AT86RF2XX_REG__TRX_CTRL_0, tmp);
+    
     /* go into RX state */
     ng_at86rf2xx_set_state(dev, NG_AT86RF2XX_STATE_RX_AACK_ON);
 

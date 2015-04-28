@@ -122,6 +122,8 @@ extern "C" {
 #define NG_AT86RF2XX_TRX_CTRL_0_MASK__PAD_IO_CLKM               (0x30)
 #define NG_AT86RF2XX_TRX_CTRL_0_MASK__CLKM_SHA_SEL              (0x08)
 #define NG_AT86RF2XX_TRX_CTRL_0_MASK__CLKM_CTRL                 (0x07)
+#define NG_AT86RF2XX_TRX_CTRL_0_MASK__TOM_EN                    (0x80)
+#define NG_AT86RF2XX_TRX_CTRL_0_PMU_EN                          (0x80)
 
 #define NG_AT86RF2XX_TRX_CTRL_0_DEFAULT__PAD_IO                 (0x00)
 #define NG_AT86RF2XX_TRX_CTRL_0_DEFAULT__PAD_IO_CLKM            (0x10)
@@ -300,6 +302,7 @@ extern "C" {
 #define NG_AT86RF2XX_XAH_CTRL_1__AACK_UPLD_RES_FT               (0x10)
 #define NG_AT86RF2XX_XAH_CTRL_1__AACK_ACK_TIME                  (0x04)
 #define NG_AT86RF2XX_XAH_CTRL_1__AACK_PROM_MODE                 (0x02)
+#define NG_AT86RF2XX_XAH_CTRL_1__AACK_SPC_EN                    (0x01)
 /** @} */
 
 /**

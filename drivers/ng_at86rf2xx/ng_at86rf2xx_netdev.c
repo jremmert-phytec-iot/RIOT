@@ -660,6 +660,48 @@ static void _isr_event(ng_netdev_t *device, uint32_t event_type)
             if (dev->event_cb && (dev->options & NG_AT86RF2XX_OPT_TELL_TX_END)) {
                 dev->event_cb(NETDEV_EVENT_TX_COMPLETE, NULL);
             }
+    /* Read out TOF values */
+
+    /* get the size of the received packet (unlocks frame buffer protection) */
+    uint8_t pkt_len = ng_at86rf2xx_rx_len(dev);
+
+    uint8_t tom_result[13];
+        ng_at86rf2xx_rx_read(dev, tom_result, 13, 0x73);
+        uint8_t pmu_val = ng_at86rf2xx_reg_read(dev, 0x3b);
+    /*tom_result[0] = ng_at86rf2xx_reg_read(dev, 0x73);
+    tom_result[1] = ng_at86rf2xx_reg_read(dev, 0x74);
+    tom_result[2] = ng_at86rf2xx_reg_read(dev, 0x75);
+    tom_result[3] = ng_at86rf2xx_reg_read(dev, 0x76);
+    tom_result[4] = ng_at86rf2xx_reg_read(dev, 0x77);
+    tom_result[5] = ng_at86rf2xx_reg_read(dev, 0x78);
+    tom_result[6] = ng_at86rf2xx_reg_read(dev, 0x79);
+    tom_result[7] = ng_at86rf2xx_reg_read(dev, 0x7a);
+    tom_result[8] = ng_at86rf2xx_reg_read(dev, 0x7b);
+    tom_result[9] = ng_at86rf2xx_reg_read(dev, 0x7c);
+    tom_result[10] = ng_at86rf2xx_reg_read(dev, 0x7d);
+    tom_result[11] = ng_at86rf2xx_reg_read(dev, 0x7e);
+    tom_result[12] = ng_at86rf2xx_reg_read(dev, 0x7f);*/
+    printf("PKT_LEN: %d\n",pkt_len);
+    printf("TOM_CPM_0: %d\n",tom_result[0]);
+    printf("TOM_CPM_1: %d\n",tom_result[1]);
+    printf("TOM_CPM_2: %d\n",tom_result[2]);
+    printf("TOM_CPM_3: %d\n",tom_result[3]);
+    printf("TOM_CPM_4: %d\n",tom_result[4]);
+    printf("TOM_CPM_5: %d\n",tom_result[5]);
+    printf("TOM_CPM_6: %d\n",tom_result[6]);
+    printf("TOM_CPM_7: %d\n",tom_result[7]);
+    printf("TOM_CPM_8: %d\n",tom_result[8]);
+    printf("TOM_FEC_0: %d\n",tom_result[9]);
+    printf("TOM_TIM_0: %d\n",tom_result[10]);
+    printf("TOM_TIM_1: %d\n",tom_result[11]);
+    printf("TOM_TIM_2: %d\n",tom_result[12]);
+
+            uint32_t tom_result_32 = tom_result[10];
+            tom_result_32 |= (tom_result[11]<<8);
+            tom_result_32 |= (tom_result[12]<<16);
+            printf("TOM_RESULT_32: %d\n", (int)tom_result_32);
+    printf("PMU_VAL: %d\n", pmu_val);
+
             DEBUG("[ng_at86rf2xx] EVT - TX_END\n");
             ng_at86rf2xx_set_state(dev, dev->idle_state);
         }
