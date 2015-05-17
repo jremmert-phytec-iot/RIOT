@@ -8,22 +8,17 @@ BOARD_INSUFFICIENT_RAM := stm32f0discovery
 ifneq (,$(filter pba-d-01-kw2x,$(BOARD)))
   DRIVER ?= kw2xrf
   USE_BOARD_PARAMETERS:=true
- # export KWRF_SPI ?= SPI_1
- # export KWRF_CS ?= GPIO_24
- # export KWRF_INT ?= GPIO_23
- # export KWRF_SPI_SPEED ?= SPI_SPEED_10MHZ
- # export KW2XRF_SHARED_SPI ?= 0
 endif
 
 ifneq (,$(DRIVER))
   USEMODULE += $(DRIVER)
 else
-  # default to kw2xrf 
-  USEMODULE += kw2xrf 
+  # default to kw2xrf
+  USEMODULE += kw2xrf
 endif
 
 ifneq (true,$(USE_BOARD_PARAMETERS))
-  # This adds . to include path so generic ng_at86rf2xx_params.h gets picked
+  # This adds . to include path so generic kw2xrf_params.h gets picked
   # up.  All boards actually having such a device on board should define
   # USE_BOARD_PARAMETERS=true above to skip this step, as the board provides
   # this header.
