@@ -56,6 +56,24 @@ void kw2xrf_write_dreg(uint8_t addr, uint8_t value);
 uint8_t kw2xrf_read_dreg(uint8_t addr);
 
 /**
+ * @brief Writes to kw2xrf direct registers.
+ *
+ * @param[in] addr Address of the register to write into.
+ * @param[in] buf Value that shall be written.
+ * @param[in] length Length of the register.
+ */
+size_t kw2xrf_write_dregs(uint8_t addr, uint8_t *buf, uint8_t length);
+
+/**
+ * @brief Reads a byte from the kw2xrf indirect register.
+ *
+ * @param[in] addr Address of the register to read.
+ * @param[in] buf Buffer, where the content of the reg shall be written to.
+ * @param[in] length Length of the register.
+ */
+size_t kw2xrf_read_dregs(uint8_t addr, uint8_t *buf, uint8_t length);
+
+/**
  * @brief Writes to  a byte from the kw2xrf indirect register.
  *
  * @param[in] addr Address of the register to write into.

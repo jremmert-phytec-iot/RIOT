@@ -95,6 +95,24 @@ uint8_t kw2xrf_read_dreg(uint8_t addr)
     return value;
 }
 
+size_t kw2xrf_write_dregs(uint8_t addr, uint8_t *buf, uint8_t length)
+{
+    kw2xrf_spi_transfer_head();
+    size_t i = spi_transfer_regs(kw2xrf_spi, addr, (char *)buf, NULL, length);
+    kw2xrf_spi_transfer_tail();
+    return i;
+}
+
+size_t kw2xrf_read_dregs(uint8_t addr, uint8_t *buf, uint8_t length)
+{
+    kw2xrf_spi_transfer_head();
+    size_t i = spi_transfer_regs(kw2xrf_spi, (addr | MKW2XDRF_REG_READ),
+                                 NULL, (char *)buf, length);
+    kw2xrf_spi_transfer_tail();
+    return i;
+}
+
+
 void kw2xrf_write_iregs(uint8_t addr, uint8_t *buf, uint8_t length)
 {
     if (length > (KW2XRF_IBUF_LENGTH - 1)) {
