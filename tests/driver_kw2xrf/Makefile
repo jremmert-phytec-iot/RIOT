@@ -45,6 +45,8 @@ ifneq (true,$(USE_BOARD_PARAMETERS))
 
 endif
 
+CFLAGS += -DKW2XRF_TESTMODE=1
+
 # finally include the actual chosen driver
 USEMODULE += $(DRIVER)
 
