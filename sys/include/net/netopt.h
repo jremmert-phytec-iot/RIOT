@@ -216,6 +216,11 @@ typedef enum {
     NETOPT_ENCRYPTION_KEY,    /**< set encryption key */
 	NETOPT_RX_LISTENING,
 
+    /**
+     * @brief get/set radio testmode e.g. for CE or FCC certification
+     */
+    NETOPT_RF_TESTMODE,
+
     /* add more options if needed */
 
     /**
