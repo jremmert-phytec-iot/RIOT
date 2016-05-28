@@ -261,9 +261,9 @@ int _get(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
                 !!(dev->netdev.flags & KW2XRF_OPT_TELL_TX_END);
             return sizeof(netopt_enable_t);
 
-        case NETOPT_CSMA:
+        case NETOPT_AUTOCCA:
             *((netopt_enable_t *)value) =
-                !!(dev->netdev.flags & KW2XRF_OPT_CSMA);
+                !!(dev->netdev.flags & KW2XRF_OPT_AUTOCCA);
             return sizeof(netopt_enable_t);
 
         case NETOPT_TX_POWER:
@@ -288,13 +288,6 @@ int _get(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
                 *((netopt_enable_t *)value) = NETOPT_DISABLE;
             }
             return sizeof(netopt_enable_t);
-
-        case NETOPT_CSMA_RETRIES:
-            if (len < sizeof(uint8_t)) {
-                return -EOVERFLOW;
-            }
-            *((uint8_t *)value) = kw2xrf_get_csma_max_retries(dev);
-            return sizeof(uint8_t);
 
         case NETOPT_CCA_THRESHOLD:
             if (len < sizeof(uint8_t)) {
@@ -445,9 +438,10 @@ static int _set(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
             res = sizeof(netopt_enable_t);
             break;
 
-        case NETOPT_CSMA:
-        case NETOPT_CSMA_RETRIES:
-            res = -EINVAL;
+        case NETOPT_AUTOCCA:
+            kw2xrf_set_option(dev, KW2XRF_OPT_AUTOCCA,
+                                 ((bool *)value)[0]);
+            res = sizeof(netopt_enable_t);
             break;
 
         case NETOPT_CCA_THRESHOLD:
