@@ -94,7 +94,7 @@ extern "C" {
 #define KW2XRF_OPT_RAWDUMP          (NETDEV2_IEEE802154_RAW)           /**< legacy define */
 #define KW2XRF_OPT_AUTOACK          (NETDEV2_IEEE802154_ACK_REQ)       /**< legacy define */
 
-#define KW2XRF_OPT_CSMA             (0x0100)    /**< CSMA active */
+#define KW2XRF_OPT_AUTOCCA          (0x0100)    /**< CCA befor TX active */
 #define KW2XRF_OPT_PROMISCUOUS      (0x0200)    /**< promiscuous mode
                                                   *   active */
 #define KW2XRF_OPT_PRELOADING       (0x0400)    /**< preloading enabled */

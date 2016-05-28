@@ -140,7 +140,7 @@ void kw2xrf_reset_phy(kw2xrf_t *dev)
     kw2xrf_set_rx_watermark(dev, 1);
 
     kw2xrf_set_option(dev, KW2XRF_OPT_AUTOACK, true);
-    kw2xrf_set_option(dev, KW2XRF_OPT_CSMA, true);
+    kw2xrf_set_option(dev, KW2XRF_OPT_AUTOCCA, true);
 
     kw2xrf_set_power_mode(dev, KW2XRF_AUTODOZE);
     kw2xrf_set_sequence(dev, dev->idle_state);
