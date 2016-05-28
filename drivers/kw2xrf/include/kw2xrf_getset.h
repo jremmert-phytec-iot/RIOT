@@ -60,8 +60,6 @@ uint8_t kw2xrf_get_max_retries(kw2xrf_t *dev);
 
 void kw2xrf_set_max_retries(kw2xrf_t *dev, uint8_t value);
 
-uint8_t kw2xrf_get_csma_max_retries(kw2xrf_t *dev);
-
 int kw2xrf_cca(kw2xrf_t *dev);
 
 void kw2xrf_set_rx_watermark(kw2xrf_t *dev, uint8_t value);

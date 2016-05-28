@@ -337,8 +337,8 @@ void kw2xrf_set_option(kw2xrf_t *dev, uint16_t option, bool state)
 
         /* trigger option specific actions */
         switch (option) {
-            case KW2XRF_OPT_CSMA:
-                DEBUG("[kw2xrf] opt: enabling CSMA mode\n");
+            case KW2XRF_OPT_AUTOCCA:
+                DEBUG("[kw2xrf] opt: enabling CCA before TX mode\n");
                 kw2xrf_set_dreg_bit(dev, MKW2XDM_PHY_CTRL1,
                     MKW2XDM_PHY_CTRL1_CCABFRTX);
                 break;
@@ -383,7 +383,7 @@ void kw2xrf_set_option(kw2xrf_t *dev, uint16_t option, bool state)
         dev->netdev.flags &= ~(option);
         /* trigger option specific actions */
         switch (option) {
-            case KW2XRF_OPT_CSMA:
+            case KW2XRF_OPT_AUTOCCA:
                 kw2xrf_clear_dreg_bit(dev, MKW2XDM_PHY_CTRL1,
                     MKW2XDM_PHY_CTRL1_CCABFRTX);
                 break;
@@ -463,11 +463,6 @@ uint8_t kw2xrf_get_max_retries(kw2xrf_t *dev)
 
 void kw2xrf_set_max_retries(kw2xrf_t *dev, uint8_t value)
 {
-}
-
-uint8_t kw2xrf_get_csma_max_retries(kw2xrf_t *dev)
-{
-    return 0;
 }
 
 int kw2xrf_cca(kw2xrf_t *dev)
