@@ -202,6 +202,14 @@ typedef enum {
     NETOPT_CCA_THRESHOLD,
 
     /**
+     * @brief get/set the CCA mode for the radio transceiver
+     *
+     * Set the type corresponding to the respective PHY standard,
+     * e.g Std 802.15.4
+     */
+    NETOPT_CCA_MODE,
+
+    /**
      * @brief get statistics about sent and received packets and data of the device or protocol
      *
      * Expects a pointer to a @ref netstats_t struct that will be pointed to
