@@ -309,6 +309,13 @@ void kw2xrf_set_cca_mode(kw2xrf_t *dev, uint8_t mode)
     kw2xrf_write_dreg(MKW2XDM_PHY_CTRL4, tmp);
 }
 
+uint8_t kw2xrf_get_cca_mode(kw2xrf_t *dev)
+{
+    uint8_t tmp;
+    tmp = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
+    return (tmp & MKW2XDM_PHY_CTRL4_CCATYPE_MASK) >> MKW2XDM_PHY_CTRL4_CCATYPE_SHIFT;
+}
+
 uint32_t kw2xrf_get_rssi(uint32_t value)
 {
     /* Get rssi (Received Signal Strength Indicator, unit is dBm)

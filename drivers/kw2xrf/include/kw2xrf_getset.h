@@ -52,6 +52,8 @@ void kw2xrf_set_cca_threshold(kw2xrf_t *dev, int8_t value);
 
 void kw2xrf_set_cca_mode(kw2xrf_t *dev, uint8_t mode);
 
+uint8_t kw2xrf_get_cca_mode(kw2xrf_t *dev);
+
 uint32_t kw2xrf_get_rssi(uint32_t value);
 
 netopt_state_t kw2xrf_get_status(kw2xrf_t *dev);
