@@ -303,7 +303,7 @@ int _get(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
                 return -EOVERFLOW;
             }
 	    else {
-                *(uint8_t *)value = kw2xrf_get_cca_mode(dev) - 1;
+                *(uint8_t *)value = kw2xrf_get_cca_mode(dev);
                 switch (*((int8_t *)value)) {
                     case NETDEV2_IEEE802154_CCA_MODE_1:
                     case NETDEV2_IEEE802154_CCA_MODE_2:
@@ -481,7 +481,7 @@ static int _set(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
                     case NETDEV2_IEEE802154_CCA_MODE_1:
                     case NETDEV2_IEEE802154_CCA_MODE_2:
                     case NETDEV2_IEEE802154_CCA_MODE_3:
-                        kw2xrf_set_cca_mode(dev, *((int8_t*)value) + 1);
+                        kw2xrf_set_cca_mode(dev, *((int8_t*)value));
                         res = sizeof(uint8_t);
                         break;
                     case NETDEV2_IEEE802154_CCA_MODE_4:
