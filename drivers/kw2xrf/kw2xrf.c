@@ -69,6 +69,13 @@ static void kw2xrf_set_address(kw2xrf_t *dev)
 
         cpuid_get(cpuid);
 
+	/* generate short hardware address if CPUID_LEN > 0 */
+	for (int i = 0; i < CPUID_LEN; i++) {
+	    /* XOR each even byte of the CPUID with LSB of short address
+	       and each odd byte with MSB */
+	    addr_short ^= (uint16_t)(cpuid[i] << ((i & 0x01) * 8));
+	}
+
         for (int i = IEEE802154_LONG_ADDRESS_LEN; i < CPUID_LEN; i++) {
             cpuid[i & 0x07] ^= cpuid[i];
         }
@@ -78,7 +85,6 @@ static void kw2xrf_set_address(kw2xrf_t *dev)
         cpuid[0] |= 0x02;
         /* copy and set long address */
         memcpy(&addr_long, cpuid, IEEE802154_LONG_ADDRESS_LEN);
-        addr_short = addr_long.uint16[3].u16;
     }
     kw2xrf_set_addr_long(dev, NTOHLL(addr_long.uint64.u64));
     kw2xrf_set_addr_short(dev, addr_short);
