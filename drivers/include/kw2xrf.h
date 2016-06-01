@@ -92,7 +92,7 @@ extern "C" {
  */
 #define KW2XRF_OPT_SRC_ADDR_LONG    (NETDEV2_IEEE802154_SRC_MODE_LONG) /**< legacy define */
 #define KW2XRF_OPT_RAWDUMP          (NETDEV2_IEEE802154_RAW)           /**< legacy define */
-#define KW2XRF_OPT_AUTOACK          (NETDEV2_IEEE802154_ACK_REQ)       /**< legacy define */
+#define KW2XRF_OPT_ACK_REQ          (NETDEV2_IEEE802154_ACK_REQ)       /**< legacy define */
 
 #define KW2XRF_OPT_AUTOCCA          (0x0100)    /**< CCA befor TX active */
 #define KW2XRF_OPT_PROMISCUOUS      (0x0200)    /**< promiscuous mode
@@ -105,7 +105,9 @@ extern "C" {
 #define KW2XRF_OPT_TELL_RX_START    (0x2000)    /**< notify MAC layer on RX
                                                   *   start */
 #define KW2XRF_OPT_TELL_RX_END      (0x4000)    /**< notify MAC layer on RX
-                                                     *   finished */
+                                                  *   finished */
+#define KW2XRF_OPT_AUTOACK          (0x8000)    /**< enable automatically ACK
+                                                  *   for incommint packet */
 /** @} */
 
 /**
