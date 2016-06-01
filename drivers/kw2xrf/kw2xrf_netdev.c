@@ -409,6 +409,11 @@ static int _set(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
                               ((bool *)value)[0]);
             break;
 
+        case NETOPT_ACK_REQ:
+            kw2xrf_set_option(dev, KW2XRF_OPT_ACK_REQ,
+                              ((bool *)value)[0]);
+            break;
+
         case NETOPT_RETRANS:
             if (len > sizeof(uint8_t)) {
                 res = -EOVERFLOW;
