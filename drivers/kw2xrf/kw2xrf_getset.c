@@ -362,7 +362,12 @@ void kw2xrf_set_option(kw2xrf_t *dev, uint16_t option, bool state)
 
             case KW2XRF_OPT_AUTOACK:
                 kw2xrf_set_dreg_bit(dev, MKW2XDM_PHY_CTRL1,
-                    MKW2XDM_PHY_CTRL1_AUTOACK | MKW2XDM_PHY_CTRL1_RXACKRQD);
+                    MKW2XDM_PHY_CTRL1_AUTOACK);
+                break;
+
+            case KW2XRF_OPT_ACK_REQ:
+                kw2xrf_set_dreg_bit(dev, MKW2XDM_PHY_CTRL1,
+                    MKW2XDM_PHY_CTRL1_RXACKRQD);
                 break;
 
             case KW2XRF_OPT_TELL_RX_START:
@@ -402,13 +407,22 @@ void kw2xrf_set_option(kw2xrf_t *dev, uint16_t option, bool state)
                 /* re-enable AUTOACK only if the option is set */
                 if (dev->netdev.flags & KW2XRF_OPT_AUTOACK) {
                     kw2xrf_set_dreg_bit(dev, MKW2XDM_PHY_CTRL1,
-                        MKW2XDM_PHY_CTRL1_AUTOACK | MKW2XDM_PHY_CTRL1_RXACKRQD);
+                        MKW2XDM_PHY_CTRL1_AUTOACK);
+                }
+                if (dev->netdev.flags & KW2XRF_OPT_ACK_REQ) {
+                    kw2xrf_set_dreg_bit(dev, MKW2XDM_PHY_CTRL1,
+                        MKW2XDM_PHY_CTRL1_RXACKRQD);
                 }
                 break;
 
             case KW2XRF_OPT_AUTOACK:
                 kw2xrf_clear_dreg_bit(dev, MKW2XDM_PHY_CTRL1,
-                    MKW2XDM_PHY_CTRL1_AUTOACK | MKW2XDM_PHY_CTRL1_RXACKRQD);
+                    MKW2XDM_PHY_CTRL1_AUTOACK);
+                break;
+
+            case KW2XRF_OPT_ACK_REQ:
+                kw2xrf_clear_dreg_bit(dev, MKW2XDM_PHY_CTRL1,
+                    MKW2XDM_PHY_CTRL1_RXACKRQD);
                 break;
 
             case KW2XRF_OPT_TELL_RX_START:
