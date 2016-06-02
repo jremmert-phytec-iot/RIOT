@@ -202,12 +202,11 @@ typedef enum {
     NETOPT_CCA_THRESHOLD,
 
     /**
-     * @brief get/set the CCA mode for the radio transceiver
-     *
-     * Set the type corresponding to the respective PHY standard,
-     * e.g Std 802.15.4
+     * @brief CCA mode for the radio transceiver
      */
-    NETOPT_CCA_MODE,
+    NETOPT_CCA_MODE,            /**< get/set the CCA mode as uint8_t
+                                 *   corresponding to the respective PHY standard,
+                                 *   e.g Std 802.15.4 */
 
     /**
      * @brief get statistics about sent and received packets and data of the device or protocol
@@ -225,9 +224,18 @@ typedef enum {
 	NETOPT_RX_LISTENING,
 
     /**
-     * @brief get/set radio testmode e.g. for CE or FCC certification
+     * @brief Test mode for the radio, e.g. for CE or FCC certification
+     *
+     * @note Setting this option should always return -ENOTSUP,
+     * unless it was explicitly allowed to build time,
+     * therefore it should be secured with an additional macro in the device driver.
+     * For development and certification purposes only, this test modes can disturb
+     * normal radio communications and exceed the limits, established by 
+     * the regulatory authority.
      */
-    NETOPT_RF_TESTMODE,
+    NETOPT_RF_TESTMODE,         /**< get/set the test mode as type netopt_rf_testmode_t
+                                 *   or as uint8_t if the radio supports other
+                                 *   vendor specific test modes */
 
     /* add more options if needed */
 
@@ -268,6 +276,16 @@ typedef enum {
                                  *   state of the network device is @ref NETOPT_STATE_IDLE */
     /* add other states if needed */
 } netopt_state_t;
+
+/**
+ * @brief   Option parameter to be used with @ref NETOPT_RF_TESTMODE
+ */
+typedef enum {
+    NETOPT_RF_TESTMODE_IDLE = 0,    /**< idle mode, radio off */
+    NETOPT_RF_TESTMODE_CRX,         /**< continuous rx mode */
+    NETOPT_RF_TESTMODE_CTX_CW,      /**< carrier wave continuous tx mode */
+    NETOPT_RF_TESTMODE_CTX_PRBS9,   /**< PRBS9 continuous tx mode */
+} netopt_rf_testmode_t;
 
 /**
  * @brief   Get a string ptr corresponding to opt, for debugging
