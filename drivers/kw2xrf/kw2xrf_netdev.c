@@ -43,7 +43,7 @@ static void _irq_handler(void *arg)
     netdev2_t *dev = (netdev2_t *) arg;
 
     if (dev->event_callback) {
-        dev->event_callback(dev, NETDEV2_EVENT_ISR, NULL);
+        dev->event_callback(dev, NETDEV2_EVENT_ISR);
     }
 }
 
@@ -530,13 +530,13 @@ static void _isr_event_seq_r(netdev2_t *netdev, uint8_t *dregs)
     if (dregs[MKW2XDM_IRQSTS1] & MKW2XDM_IRQSTS1_RXWTRMRKIRQ) {
         DEBUG("[kw2xrf]: got RXWTRMRKIRQ\n");
         irqsts1 |= MKW2XDM_IRQSTS1_RXWTRMRKIRQ;
-        netdev->event_callback(netdev, NETDEV2_EVENT_RX_STARTED, NULL);
+        netdev->event_callback(netdev, NETDEV2_EVENT_RX_STARTED);
     }
 
     if (dregs[MKW2XDM_IRQSTS1] & MKW2XDM_IRQSTS1_RXIRQ) {
         DEBUG("[kw2xrf]: finished RXSEQ\n");
         irqsts1 |= MKW2XDM_IRQSTS1_RXIRQ;
-        netdev->event_callback(netdev, NETDEV2_EVENT_RX_COMPLETE, NULL);
+        netdev->event_callback(netdev, NETDEV2_EVENT_RX_COMPLETE);
         if (dregs[MKW2XDM_PHY_CTRL1] & MKW2XDM_PHY_CTRL1_AUTOACK) {
             DEBUG("[kw2xrf]: perform TX ACK\n");
         }
@@ -575,10 +575,10 @@ static void _isr_event_seq_t(netdev2_t *netdev, uint8_t *dregs)
             irqsts1 |= MKW2XDM_IRQSTS1_CCAIRQ; 
             if (dregs[MKW2XDM_IRQSTS2] & MKW2XDM_IRQSTS2_CCA) {
                 DEBUG("[kw2xrf]: CCA CH busy\n");
-                netdev->event_callback(netdev, NETDEV2_EVENT_TX_MEDIUM_BUSY, NULL);
+                netdev->event_callback(netdev, NETDEV2_EVENT_TX_MEDIUM_BUSY);
             }
             else {
-                netdev->event_callback(netdev, NETDEV2_EVENT_TX_COMPLETE, NULL);
+                netdev->event_callback(netdev, NETDEV2_EVENT_TX_COMPLETE);
             }
         }
 
@@ -645,7 +645,7 @@ static void _isr_event_seq_tr(netdev2_t *netdev, uint8_t *dregs)
             irqsts1 |= MKW2XDM_IRQSTS1_CCAIRQ; 
             if (dregs[MKW2XDM_IRQSTS2] & MKW2XDM_IRQSTS2_CCA) {
                 DEBUG("[kw2xrf]: CCA CH busy\n");
-                netdev->event_callback(netdev, NETDEV2_EVENT_TX_MEDIUM_BUSY, NULL);
+                netdev->event_callback(netdev, NETDEV2_EVENT_TX_MEDIUM_BUSY);
             }
         }
 
@@ -653,7 +653,7 @@ static void _isr_event_seq_tr(netdev2_t *netdev, uint8_t *dregs)
         irqsts1 |= MKW2XDM_IRQSTS1_SEQIRQ;
         assert(dev->pending_tx != 0);
         dev->pending_tx--;
-        netdev->event_callback(netdev, NETDEV2_EVENT_TX_COMPLETE, NULL);
+        netdev->event_callback(netdev, NETDEV2_EVENT_TX_COMPLETE);
         kw2xrf_seq_timeout_off(dev);
         kw2xrf_set_idle_sequence(dev);
     }
@@ -661,7 +661,7 @@ static void _isr_event_seq_tr(netdev2_t *netdev, uint8_t *dregs)
         DEBUG("[kw2xrf]: TC4TMOUT, no SEQIRQ, TX failed\n");
         assert(dev->pending_tx != 0);
         dev->pending_tx--;
-        netdev->event_callback(netdev, NETDEV2_EVENT_TX_NOACK, NULL);
+        netdev->event_callback(netdev, NETDEV2_EVENT_TX_NOACK);
         kw2xrf_seq_timeout_off(dev);
         kw2xrf_set_sequence(dev, dev->idle_state);
     }
