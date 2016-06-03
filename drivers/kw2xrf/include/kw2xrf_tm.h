@@ -25,13 +25,10 @@ extern "C" {
 #include "kw2xrf.h"
 #include "kw2xrf_reg.h"
 #include "kw2xrf_getset.h"
+#include "net/netopt.h"
 
 enum mkw2xrf_testmode {
-    KW2XRF_TM_IDLE = 0,
-    KW2XRF_TM_CTX_PRBS9,
-    KW2XRF_TM_CRX,
-    KW2XRF_TM_CTX_PREAMBLE,
-    KW2XRF_TM_CTX_CW,
+    KW2XRF_TM_CTX_PREAMBLE = NETOPT_RF_TESTMODE_CTX_PRBS9 + 1,
     KW2XRF_TM_CTX_2MHZ,
     KW2XRF_TM_CTX_200KHZ,
     KW2XRF_TM_CTX_1MBPS_PRBS9,
@@ -40,7 +37,7 @@ enum mkw2xrf_testmode {
     KW2XRF_TM_CTX_NM1,
 };
 
-int kw2xrf_set_test_mode(kw2xrf_t *dev, uint32_t mode);
+int kw2xrf_set_test_mode(kw2xrf_t *dev, uint8_t mode);
 
 #endif
 

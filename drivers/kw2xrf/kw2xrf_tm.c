@@ -49,7 +49,7 @@ inline static void disable_xcvr_test_mode(void)
     kw2xrf_write_iregs(MKW2XDMI_TESTMODE_CTRL, &reg, 1);
 }
 
-int kw2xrf_set_test_mode(kw2xrf_t *dev, uint32_t mode)
+int kw2xrf_set_test_mode(kw2xrf_t *dev, uint8_t mode)
 {
     uint8_t reg = 0;
     uint8_t buf[2];
@@ -59,14 +59,14 @@ int kw2xrf_set_test_mode(kw2xrf_t *dev, uint32_t mode)
     kw2xrf_set_channel(dev, dev->netdev.chan);
 
     switch(mode) {
-        case KW2XRF_TM_IDLE:
+        case NETOPT_RF_TESTMODE_IDLE:
             reg = 0;
             kw2xrf_write_iregs(MKW2XDMI_TX_MODE_CTRL, &reg, 1);
 
             kw2xrf_set_sequence(dev, XCVSEQ_IDLE);
             break;
 
-        case KW2XRF_TM_CRX:
+        case NETOPT_RF_TESTMODE_CRX:
             /* set continuous RX mode */
             reg = 0;
             kw2xrf_write_iregs(MKW2XDMI_TX_MODE_CTRL, &reg, 1);
@@ -92,7 +92,7 @@ int kw2xrf_set_test_mode(kw2xrf_t *dev, uint32_t mode)
             kw2xrf_set_sequence(dev, XCVSEQ_TRANSMIT);
             break;
 
-        case KW2XRF_TM_CTX_CW:
+        case NETOPT_RF_TESTMODE_CTX_CW:
             /* set continuous TX mode, transmit unmodulated carrier */
             reg = MKW2XDMI_TX_MODE_CTRL_DTS0;
             kw2xrf_write_iregs(MKW2XDMI_TX_MODE_CTRL, &reg, 1);
@@ -163,7 +163,7 @@ int kw2xrf_set_test_mode(kw2xrf_t *dev, uint32_t mode)
             kw2xrf_set_sequence(dev, XCVSEQ_TRANSMIT);
             break;
 
-        case KW2XRF_TM_CTX_PRBS9:
+        case NETOPT_RF_TESTMODE_CTX_PRBS9:
             /* set continuous TX mode, transmit PRBS9 pattern */
             reg = MKW2XDMI_TX_MODE_CTRL_DTS2 | MKW2XDMI_TX_MODE_CTRL_DTS1
                 | MKW2XDMI_TX_MODE_CTRL_DTS0;
