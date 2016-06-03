@@ -500,12 +500,12 @@ static int _set(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
 
         case NETOPT_RF_TESTMODE:
 #ifdef KW2XRF_TESTMODE
-            if (len < sizeof(uint32_t)) {
+            if (len < sizeof(uint8_t)) {
                 res = -EOVERFLOW;
             }
 	    else {
-                kw2xrf_set_test_mode(dev, *((uint32_t *)value));
-                res = sizeof(uint32_t);
+                kw2xrf_set_test_mode(dev, *((uint8_t *)value));
+                res = sizeof(uint8_t);
             }
 #endif
             break;
