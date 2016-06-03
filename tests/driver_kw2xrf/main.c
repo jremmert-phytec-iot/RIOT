@@ -26,6 +26,7 @@
 #include "net/gnrc/pktdump.h"
 #include "net/gnrc/netif.h"
 #include "net/gnrc/netapi.h"
+#include "net/netopt.h"
 
 #ifdef KW2XRF_TESTMODE
 #include "kw2xrf_tm.h"
@@ -56,7 +57,7 @@ static bool _is_iface(kernel_pid_t dev)
     return false;
 }
 
-static void _set_test_mode(int argc, char **argv, uint32_t mode)
+static void _set_test_mode(int argc, char **argv, uint8_t mode)
 {
     if (_is_number(argv[1])) {
         kernel_pid_t dev = (kernel_pid_t)atoi(argv[1]);
@@ -72,31 +73,31 @@ static void _set_test_mode(int argc, char **argv, uint32_t mode)
 
 static int _tm_idle(int argc, char **argv)
 {
-    _set_test_mode(argc, argv, KW2XRF_TM_IDLE);
-    return 0;
-}
-
-static int _tm_ctx_prbs9(int argc, char **argv)
-{
-    _set_test_mode(argc, argv, KW2XRF_TM_CTX_PRBS9);
+    _set_test_mode(argc, argv, NETOPT_RF_TESTMODE_IDLE);
     return 0;
 }
 
 static int _tm_crx(int argc, char **argv)
 {
-    _set_test_mode(argc, argv, KW2XRF_TM_CRX);
+    _set_test_mode(argc, argv, NETOPT_RF_TESTMODE_CRX);
+    return 0;
+}
+
+static int _tm_ctx_cw(int argc, char **argv)
+{
+    _set_test_mode(argc, argv, NETOPT_RF_TESTMODE_CTX_CW);
+    return 0;
+}
+
+static int _tm_ctx_prbs9(int argc, char **argv)
+{
+    _set_test_mode(argc, argv, NETOPT_RF_TESTMODE_CTX_PRBS9);
     return 0;
 }
 
 static int _tm_ctx_preamble(int argc, char **argv)
 {
     _set_test_mode(argc, argv, KW2XRF_TM_CTX_PREAMBLE);
-    return 0;
-}
-
-static int _tm_ctx_cw(int argc, char **argv)
-{
-    _set_test_mode(argc, argv, KW2XRF_TM_CTX_CW);
     return 0;
 }
 
