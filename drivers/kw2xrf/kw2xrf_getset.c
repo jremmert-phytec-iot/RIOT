@@ -80,7 +80,7 @@ void kw2xrf_set_tx_power(kw2xrf_t *dev, int16_t txpower)
     }
 
     uint8_t level = pow_lt[txpower - MKW2XDRF_OUTPUT_POWER_MIN];
-    kw2xrf_write_dreg(MKW2XDM_PA_PWR, MKW2XDM_PA_PWR(level));
+    kw2xrf_write_dreg(dev, MKW2XDM_PA_PWR, MKW2XDM_PA_PWR(level));
     dev->tx_power = txpower;
 }
 
@@ -91,9 +91,9 @@ uint16_t kw2xrf_get_txpower(kw2xrf_t *dev)
 
 uint8_t kw2xrf_get_channel(kw2xrf_t *dev)
 {
-    uint8_t pll_int = kw2xrf_read_dreg(MKW2XDM_PLL_INT0);
-    uint16_t pll_frac = kw2xrf_read_dreg(MKW2XDM_PLL_FRAC0_LSB);
-    pll_frac |= ((uint16_t)kw2xrf_read_dreg(MKW2XDM_PLL_FRAC0_MSB) << 8);
+    uint8_t pll_int = kw2xrf_read_dreg(dev, MKW2XDM_PLL_INT0);
+    uint16_t pll_frac = kw2xrf_read_dreg(dev, MKW2XDM_PLL_FRAC0_LSB);
+    pll_frac |= ((uint16_t)kw2xrf_read_dreg(dev, MKW2XDM_PLL_FRAC0_MSB) << 8);
 
     for (int i = 0; i < 16; i++) {
         if ((pll_frac_lt[i] == pll_frac) && (pll_int_lt[i] == pll_int)) {
@@ -103,10 +103,10 @@ uint8_t kw2xrf_get_channel(kw2xrf_t *dev)
     return 0;
 }
 
-static int kw2xrf_get_sequence(void)
+static int kw2xrf_get_sequence(kw2xrf_t *dev)
 {
     int reg = 0;
-    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
+    reg = kw2xrf_read_dreg(dev, MKW2XDM_PHY_CTRL1);
     reg &= MKW2XDM_PHY_CTRL1_XCVSEQ_MASK;
     return reg;
 }
@@ -114,7 +114,7 @@ static int kw2xrf_get_sequence(void)
 int kw2xrf_set_channel(kw2xrf_t *dev, uint8_t channel)
 {
     /* Save old sequence to restore this state later */
-    uint8_t old_seq = kw2xrf_get_sequence();
+    uint8_t old_seq = kw2xrf_get_sequence(dev);
 
     if (channel < KW2XRF_MIN_CHANNEL || channel > KW2XRF_MAX_CHANNEL) {
         DEBUG("[kw2xrf]: Invalid channel %i set\n", channel);
@@ -126,9 +126,9 @@ int kw2xrf_set_channel(kw2xrf_t *dev, uint8_t channel)
     }
 
     uint8_t tmp = channel - 11;
-    kw2xrf_write_dreg(MKW2XDM_PLL_INT0, MKW2XDM_PLL_INT0_VAL(pll_int_lt[tmp]));
-    kw2xrf_write_dreg(MKW2XDM_PLL_FRAC0_LSB, (uint8_t)pll_frac_lt[tmp]);
-    kw2xrf_write_dreg(MKW2XDM_PLL_FRAC0_MSB, (uint8_t)(pll_frac_lt[tmp] >> 8));
+    kw2xrf_write_dreg(dev, MKW2XDM_PLL_INT0, MKW2XDM_PLL_INT0_VAL(pll_int_lt[tmp]));
+    kw2xrf_write_dreg(dev, MKW2XDM_PLL_FRAC0_LSB, (uint8_t)pll_frac_lt[tmp]);
+    kw2xrf_write_dreg(dev, MKW2XDM_PLL_FRAC0_MSB, (uint8_t)(pll_frac_lt[tmp] >> 8));
 
     dev->netdev.chan = channel;
 
@@ -145,17 +145,17 @@ void kw2xrf_abort_sequence(kw2xrf_t *dev)
     uint8_t regs[MKW2XDM_PHY_CTRL4 + 1];
 
     kw2xrf_mask_irq_b(dev);
-    kw2xrf_read_dregs(MKW2XDM_IRQSTS1, regs, (MKW2XDM_PHY_CTRL4 + 1));
+    kw2xrf_read_dregs(dev, MKW2XDM_IRQSTS1, regs, (MKW2XDM_PHY_CTRL4 + 1));
 
     if ((regs[MKW2XDM_PHY_CTRL1] & MKW2XDM_PHY_CTRL1_XCVSEQ_MASK) != XCVSEQ_IDLE) {
         /* abort any ongoing sequence */
         regs[MKW2XDM_PHY_CTRL1] &= ~(MKW2XDM_PHY_CTRL1_XCVSEQ_MASK);
-        kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, regs[MKW2XDM_PHY_CTRL1]);
+        kw2xrf_write_dreg(dev, MKW2XDM_PHY_CTRL1, regs[MKW2XDM_PHY_CTRL1]);
     }
 
     uint8_t state;
     do {
-        state = kw2xrf_read_dreg(MKW2XDM_SEQ_STATE);
+        state = kw2xrf_read_dreg(dev, MKW2XDM_SEQ_STATE);
         DEBUG("[kw2xrf]: abort SEQ_STATE: %x\n", state);
     } while ((state & 0x1F) != 0);
 
@@ -163,7 +163,7 @@ void kw2xrf_abort_sequence(kw2xrf_t *dev)
     regs[MKW2XDM_IRQSTS1] = 0x7f;
     regs[MKW2XDM_IRQSTS2] = 0x03;
     regs[MKW2XDM_IRQSTS3] |= 0x0f;
-    kw2xrf_write_dregs(MKW2XDM_IRQSTS1, regs, 3);
+    kw2xrf_write_dregs(dev, MKW2XDM_IRQSTS1, regs, 3);
 
     kw2xrf_enable_irq_b(dev);
 }
@@ -175,11 +175,11 @@ void kw2xrf_abort_sequence(kw2xrf_t *dev)
 void kw2xrf_set_idle_sequence(kw2xrf_t *dev)
 {
     kw2xrf_mask_irq_b(dev);
-    uint8_t reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
+    uint8_t reg = kw2xrf_read_dreg(dev, MKW2XDM_PHY_CTRL1);
 
     /* reset sequenz manager */
     reg &= ~(MKW2XDM_PHY_CTRL1_XCVSEQ_MASK);
-    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
+    kw2xrf_write_dreg(dev, MKW2XDM_PHY_CTRL1, reg);
 
     if (dev->pending_tx) {
         DEBUG("[kw2xrf]: pending tx, cannot set idle sequenz\n");
@@ -188,7 +188,7 @@ void kw2xrf_set_idle_sequence(kw2xrf_t *dev)
 
     /* start new sequenz */
     reg |= MKW2XDM_PHY_CTRL1_XCVSEQ(dev->idle_state);
-    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
+    kw2xrf_write_dreg(dev, MKW2XDM_PHY_CTRL1, reg);
 
     kw2xrf_enable_irq_b(dev);
 }
@@ -221,10 +221,10 @@ void kw2xrf_set_sequence(kw2xrf_t *dev, kw2xrf_physeq_t seq)
     }
 
     DEBUG("[kw2xrf]: set sequence to %i\n", seq);
-    reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
+    reg = kw2xrf_read_dreg(dev, MKW2XDM_PHY_CTRL1);
     reg &= ~(MKW2XDM_PHY_CTRL1_XCVSEQ_MASK);
     reg |= MKW2XDM_PHY_CTRL1_XCVSEQ(seq);
-    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL1, reg);
+    kw2xrf_write_dreg(dev, MKW2XDM_PHY_CTRL1, reg);
 }
 
 void kw2xrf_set_pan(kw2xrf_t *dev, uint16_t pan)
@@ -234,7 +234,7 @@ void kw2xrf_set_pan(kw2xrf_t *dev, uint16_t pan)
     uint8_t val_ar[2];
     val_ar[1] = (pan >> 8);
     val_ar[0] = (uint8_t)pan;
-    kw2xrf_write_iregs(MKW2XDMI_MACPANID0_LSB, val_ar, 2);
+    kw2xrf_write_iregs(dev, MKW2XDMI_MACPANID0_LSB, val_ar, 2);
     dev->netdev.pan = pan;
 }
 
@@ -250,7 +250,7 @@ void kw2xrf_set_addr_short(kw2xrf_t *dev, uint16_t addr)
      * 0 for unicast addresses */
     dev->netdev.short_addr[1] &= 0x7F;
 #endif
-    kw2xrf_write_iregs(MKW2XDMI_MACSHORTADDRS0_LSB, val_ar,
+    kw2xrf_write_iregs(dev, MKW2XDMI_MACSHORTADDRS0_LSB, val_ar,
                        IEEE802154_SHORT_ADDRESS_LEN);
 }
 
@@ -260,7 +260,7 @@ void kw2xrf_set_addr_long(kw2xrf_t *dev, uint64_t addr)
         dev->netdev.long_addr[i] = (addr >> ((IEEE802154_LONG_ADDRESS_LEN - 1 - i) * 8));
     }
 
-    kw2xrf_write_iregs(MKW2XDMI_MACLONGADDRS0_0, (dev->netdev.long_addr),
+    kw2xrf_write_iregs(dev, MKW2XDMI_MACLONGADDRS0_0, (dev->netdev.long_addr),
                        IEEE802154_LONG_ADDRESS_LEN);
 }
 
@@ -284,7 +284,7 @@ uint64_t kw2xrf_get_addr_long(kw2xrf_t *dev)
 int8_t kw2xrf_get_cca_threshold(kw2xrf_t *dev)
 {
     uint8_t tmp;
-    kw2xrf_read_iregs(MKW2XDMI_CCA1_THRESH, &tmp, 1);
+    kw2xrf_read_iregs(dev, MKW2XDMI_CCA1_THRESH, &tmp, 1);
     /* KW2x register value represents absolute value in dBm
      * default value: -75 dBm
      */
@@ -297,22 +297,22 @@ void kw2xrf_set_cca_threshold(kw2xrf_t *dev, int8_t value)
     if (value < 0) {
         value = -value;
     }
-    kw2xrf_write_iregs(MKW2XDMI_CCA1_THRESH, (uint8_t*)&value, 1);
+    kw2xrf_write_iregs(dev, MKW2XDMI_CCA1_THRESH, (uint8_t*)&value, 1);
 }
 
 void kw2xrf_set_cca_mode(kw2xrf_t *dev, uint8_t mode)
 {
     uint8_t tmp;
-    tmp = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
+    tmp = kw2xrf_read_dreg(dev, MKW2XDM_PHY_CTRL4);
     tmp &= ~MKW2XDM_PHY_CTRL4_CCATYPE_MASK;
     tmp |= MKW2XDM_PHY_CTRL4_CCATYPE(mode);
-    kw2xrf_write_dreg(MKW2XDM_PHY_CTRL4, tmp);
+    kw2xrf_write_dreg(dev, MKW2XDM_PHY_CTRL4, tmp);
 }
 
 uint8_t kw2xrf_get_cca_mode(kw2xrf_t *dev)
 {
     uint8_t tmp;
-    tmp = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL4);
+    tmp = kw2xrf_read_dreg(dev, MKW2XDM_PHY_CTRL4);
     return (tmp & MKW2XDM_PHY_CTRL4_CCATYPE_MASK) >> MKW2XDM_PHY_CTRL4_CCATYPE_SHIFT;
 }
 
@@ -451,7 +451,7 @@ void kw2xrf_set_option(kw2xrf_t *dev, uint16_t option, bool state)
 
 netopt_state_t kw2xrf_get_status(kw2xrf_t *dev)
 {
-    uint8_t reg = kw2xrf_read_dreg(MKW2XDM_PHY_CTRL1);
+    uint8_t reg = kw2xrf_read_dreg(dev, MKW2XDM_PHY_CTRL1);
 
     switch (reg & MKW2XDM_PHY_CTRL1_XCVSEQ_MASK) {
         case XCVSEQ_RECEIVE:
@@ -496,5 +496,5 @@ int kw2xrf_cca(kw2xrf_t *dev)
 
 void kw2xrf_set_rx_watermark(kw2xrf_t *dev, uint8_t value)
 {
-    kw2xrf_write_iregs(MKW2XDMI_RX_WTR_MARK, &value, 1);
+    kw2xrf_write_iregs(dev, MKW2XDMI_RX_WTR_MARK, &value, 1);
 }
