@@ -101,7 +101,7 @@ void kw2xrf_setup(kw2xrf_t *dev, const kw2xrf_params_t *params)
     dev->state = 0;
     dev->pending_tx = 0;
 
-    kw2xrf_spi_init(dev->params.spi, dev->params.spi_speed, dev->params.cs_pin);
+    kw2xrf_spi_init(dev);
     kw2xrf_set_power_mode(dev, KW2XRF_IDLE);
     DEBUG("[kw2xrf]: setup finished\n");
 }
