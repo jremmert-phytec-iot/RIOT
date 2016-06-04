@@ -272,13 +272,6 @@ int _get(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
             *((uint16_t *)value) = kw2xrf_get_txpower(dev);
             return sizeof(uint16_t);
 
-        case NETOPT_RETRANS:
-            if (len < sizeof(uint8_t)) {
-                return -EOVERFLOW;
-            }
-            *((uint8_t *)value) = kw2xrf_get_max_retries(dev);
-            return sizeof(uint8_t);
-
         case NETOPT_IS_CHANNEL_CLR:
             if (kw2xrf_cca(dev)) {
                 *((netopt_enable_t *)value) = NETOPT_ENABLE;
@@ -411,17 +404,6 @@ static int _set(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
         case NETOPT_ACK_REQ:
             kw2xrf_set_option(dev, KW2XRF_OPT_ACK_REQ,
                               ((bool *)value)[0]);
-            break;
-
-        case NETOPT_RETRANS:
-            if (len > sizeof(uint8_t)) {
-                res = -EOVERFLOW;
-            }
-            else {
-                /* TODO: add and test it */
-                kw2xrf_set_max_retries(dev, *((uint8_t *)value));
-                res = sizeof(uint8_t);
-            }
             break;
 
         case NETOPT_PRELOADING:
