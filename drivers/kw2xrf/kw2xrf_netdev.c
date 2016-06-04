@@ -120,7 +120,7 @@ static int _send(netdev2_t *netdev, const struct iovec *vector, int count)
      * MKW2xD Reference Manual, P.192
      */
     dev->buf[0] = len + IEEE802154_FCS_LEN;
-    kw2xrf_write_fifo(dev->buf, dev->buf[0]);
+    kw2xrf_write_fifo(dev, dev->buf, dev->buf[0]);
 #ifdef MODULE_NETSTATS_L2
     netdev->stats.tx_bytes += len;
 #endif
@@ -137,10 +137,9 @@ static int _recv(netdev2_t *netdev, char *buf, int len, void *info)
 {
     kw2xrf_t *dev = (kw2xrf_t *)netdev;
     size_t pkt_len = 0;
-    /*TODO*/(void)dev;
 
     /* get size of the received packet */
-    pkt_len = kw2xrf_read_dreg(MKW2XDM_RX_FRM_LEN);
+    pkt_len = kw2xrf_read_dreg(dev, MKW2XDM_RX_FRM_LEN);
 
     /* just return length when buf == NULL */
     if (buf == NULL) {
@@ -157,7 +156,7 @@ static int _recv(netdev2_t *netdev, char *buf, int len, void *info)
         return -ENOBUFS;
     }
 
-    kw2xrf_read_fifo((uint8_t *)buf, pkt_len + 1);
+    kw2xrf_read_fifo(dev, (uint8_t *)buf, pkt_len + 1);
 
     if (info != NULL) {
         netdev2_ieee802154_rx_info_t *radio_info = info;
@@ -553,7 +552,7 @@ static void _isr_event_seq_r(netdev2_t *netdev, uint8_t *dregs)
         kw2xrf_set_idle_sequence(dev);
     }
 
-    kw2xrf_write_dreg(MKW2XDM_IRQSTS1, irqsts1);
+    kw2xrf_write_dreg(dev, MKW2XDM_IRQSTS1, irqsts1);
     dregs[MKW2XDM_IRQSTS1] &= ~irqsts1;
 }
 
@@ -587,7 +586,7 @@ static void _isr_event_seq_t(netdev2_t *netdev, uint8_t *dregs)
         kw2xrf_set_idle_sequence(dev);
     }
 
-    kw2xrf_write_dreg(MKW2XDM_IRQSTS1, irqsts1);
+    kw2xrf_write_dreg(dev, MKW2XDM_IRQSTS1, irqsts1);
     dregs[MKW2XDM_IRQSTS1] &= ~irqsts1;
 }
 
@@ -608,7 +607,7 @@ static void _isr_event_seq_cca(netdev2_t *netdev, uint8_t *dregs)
         }
         kw2xrf_set_idle_sequence(dev);
     }
-    kw2xrf_write_dreg(MKW2XDM_IRQSTS1, irqsts1);
+    kw2xrf_write_dreg(dev, MKW2XDM_IRQSTS1, irqsts1);
     dregs[MKW2XDM_IRQSTS1] &= ~irqsts1;
 }
 
@@ -666,7 +665,7 @@ static void _isr_event_seq_tr(netdev2_t *netdev, uint8_t *dregs)
         kw2xrf_set_sequence(dev, dev->idle_state);
     }
 
-    kw2xrf_write_dreg(MKW2XDM_IRQSTS1, irqsts1);
+    kw2xrf_write_dreg(dev, MKW2XDM_IRQSTS1, irqsts1);
     dregs[MKW2XDM_IRQSTS1] &= ~irqsts1;
 }
 
@@ -688,7 +687,7 @@ static void _isr_event_seq_ccca(netdev2_t *netdev, uint8_t *dregs)
         kw2xrf_seq_timeout_off(dev);
         kw2xrf_set_sequence(dev, dev->idle_state);
     }
-    kw2xrf_write_dreg(MKW2XDM_IRQSTS1, irqsts1);
+    kw2xrf_write_dreg(dev, MKW2XDM_IRQSTS1, irqsts1);
     dregs[MKW2XDM_IRQSTS1] &= ~irqsts1;
 }
 
@@ -697,7 +696,7 @@ static void _isr(netdev2_t *netdev)
     uint8_t dregs[MKW2XDM_PHY_CTRL4 + 1];
     kw2xrf_t *dev = (kw2xrf_t *)netdev;
 
-    kw2xrf_read_dregs(MKW2XDM_IRQSTS1, dregs, MKW2XDM_PHY_CTRL4 + 1);
+    kw2xrf_read_dregs(dev, MKW2XDM_IRQSTS1, dregs, MKW2XDM_PHY_CTRL4 + 1);
     kw2xrf_mask_irq_b(dev);
 
     DEBUG("[kw2xrf]: CTRL1 %0x, IRQSTS1 %0x, IRQSTS2 %0x\n",
@@ -739,11 +738,11 @@ static void _isr(netdev2_t *netdev)
         DEBUG("[kw2xrf]: untreated WAKE_IRQ\n");
         irqsts2 |= MKW2XDM_IRQSTS2_WAKE_IRQ;
     }
-    kw2xrf_write_dreg(MKW2XDM_IRQSTS2, irqsts2);
+    kw2xrf_write_dreg(dev, MKW2XDM_IRQSTS2, irqsts2);
 
     if (ENABLE_DEBUG) {
         /* for debugging only */
-        kw2xrf_read_dregs(MKW2XDM_IRQSTS1, dregs, MKW2XDM_IRQSTS1 + 3);
+        kw2xrf_read_dregs(dev, MKW2XDM_IRQSTS1, dregs, MKW2XDM_IRQSTS1 + 3);
         if (dregs[MKW2XDM_IRQSTS1] & 0x7f) {
             DEBUG("[kw2xrf]: IRQSTS1 contains untreated IRQs: 0x%02x\n",
                 dregs[MKW2XDM_IRQSTS1]);
