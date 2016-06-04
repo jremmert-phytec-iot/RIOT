@@ -477,15 +477,6 @@ netopt_state_t kw2xrf_get_status(kw2xrf_t *dev)
     return NETOPT_STATE_IDLE;
 }
 
-uint8_t kw2xrf_get_max_retries(kw2xrf_t *dev)
-{
-    return 0;
-}
-
-void kw2xrf_set_max_retries(kw2xrf_t *dev, uint8_t value)
-{
-}
-
 int kw2xrf_cca(kw2xrf_t *dev)
 {
     /* TODO: add Standalone CCA here */
