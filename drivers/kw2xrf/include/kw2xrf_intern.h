@@ -34,18 +34,16 @@ kw2xrf_powermode_t;
 
 inline void kw2xrf_set_dreg_bit(kw2xrf_t *dev, uint8_t reg, uint8_t bit)
 {
-    (void)dev;
-    uint8_t tmp = kw2xrf_read_dreg(reg);
+    uint8_t tmp = kw2xrf_read_dreg(dev, reg);
     tmp |= bit;
-    kw2xrf_write_dreg(reg, tmp);
+    kw2xrf_write_dreg(dev, reg, tmp);
 }
 
 inline void kw2xrf_clear_dreg_bit(kw2xrf_t *dev, uint8_t reg, uint8_t bit)
 {
-    (void)dev;
-    uint8_t tmp = kw2xrf_read_dreg(reg);
+    uint8_t tmp = kw2xrf_read_dreg(dev, reg);
     tmp &= ~bit;
-    kw2xrf_write_dreg(reg, tmp);
+    kw2xrf_write_dreg(dev, reg, tmp);
 }
 
 /** Enable any transceiver interrupt to assert IRQ_B */
@@ -132,7 +130,7 @@ void kw2xrf_seq_timeout_off(kw2xrf_t *dev);
 /**
  * @brief Returns Timestamp of the actual received packet
  */
-uint32_t kw2xrf_get_timestamp(void);
+uint32_t kw2xrf_get_timestamp(kw2xrf_t *dev);
 #ifdef __cplusplus
 }
 #endif
