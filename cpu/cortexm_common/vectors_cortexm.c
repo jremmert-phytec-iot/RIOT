@@ -31,6 +31,12 @@
 #include "panic.h"
 #include "vectors_cortexm.h"
 
+extern void (*__preinit_array_start []) (void) __attribute__((weak));
+extern void (*__preinit_array_end []) (void) __attribute__((weak));
+extern void (*__init_array_start []) (void) __attribute__((weak));
+extern void (*__init_array_end []) (void) __attribute__((weak));
+extern void _init (void);
+
 /**
  * @brief   Memory markers, defined in the linker script
  * @{
@@ -67,6 +73,19 @@ __attribute__((weak)) void post_startup (void)
 {
 }
 
+void __libc_init_array (void)
+{
+  size_t count;
+  size_t i;
+  count = __preinit_array_end - __preinit_array_start;
+  for (i = 0; i < count; i++)
+    __preinit_array_start[i] ();
+  _init ();
+  count = __init_array_end - __init_array_start;
+  for (i = 0; i < count; i++)
+    __init_array_start[i] ();
+}
+
 void reset_handler_default(void)
 {
     uint32_t *dst;
@@ -100,11 +119,8 @@ void reset_handler_default(void)
     board_init();
 
 #if MODULE_NEWLIB
-    /* initialize std-c library (this must be done after board_init) */
-    extern void __libc_init_array(void);
-    __libc_init_array();
+	__libc_init_array();
 #endif
-
     /* startup the kernel */
     kernel_init();
 }
