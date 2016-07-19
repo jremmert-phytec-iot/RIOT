@@ -256,11 +256,15 @@ void kw2xrf_set_addr_short(kw2xrf_t *dev, uint16_t addr)
 
 void kw2xrf_set_addr_long(kw2xrf_t *dev, uint64_t addr)
 {
+    uint64_t tmp;
+    uint8_t *ap = (uint8_t *)(&tmp);
+
     for (int i = 0; i < IEEE802154_LONG_ADDRESS_LEN; i++) {
-        dev->netdev.long_addr[i] = (addr >> ((IEEE802154_LONG_ADDRESS_LEN - 1 - i) * 8));
+        dev->netdev.long_addr[i] = (uint8_t)(addr >> (i * 8));
+        ap[i] = (addr >> ((IEEE802154_LONG_ADDRESS_LEN - 1 - i) * 8));
     }
 
-    kw2xrf_write_iregs(dev, MKW2XDMI_MACLONGADDRS0_0, (dev->netdev.long_addr),
+    kw2xrf_write_iregs(dev, MKW2XDMI_MACLONGADDRS0_0, ap,
                        IEEE802154_LONG_ADDRESS_LEN);
 }
 
@@ -274,9 +278,8 @@ uint64_t kw2xrf_get_addr_long(kw2xrf_t *dev)
     uint64_t addr;
     uint8_t *ap = (uint8_t *)(&addr);
 
-    for (int i = 0; i < IEEE802154_LONG_ADDRESS_LEN; i++) {
-        ap[i] = dev->netdev.long_addr[IEEE802154_LONG_ADDRESS_LEN - 1 - i];
-    }
+    kw2xrf_read_iregs(dev, MKW2XDMI_MACLONGADDRS0_0, ap,
+                      IEEE802154_LONG_ADDRESS_LEN);
 
     return addr;
 }
