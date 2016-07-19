@@ -86,7 +86,7 @@ static void kw2xrf_set_address(kw2xrf_t *dev)
         /* copy and set long address */
         memcpy(&addr_long, cpuid, IEEE802154_LONG_ADDRESS_LEN);
     }
-    kw2xrf_set_addr_long(dev, NTOHLL(addr_long.uint64.u64));
+    kw2xrf_set_addr_long(dev, addr_long.uint64.u64);
     kw2xrf_set_addr_short(dev, addr_short);
 }
 
