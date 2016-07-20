@@ -38,6 +38,8 @@
 
 #define _MAX_MHR_OVERHEAD           (25)
 
+#define _MACACKWAITDURATION         (864 / 16) /* 864us * 62500Hz */
+
 static void _irq_handler(void *arg)
 {
     netdev2_t *dev = (netdev2_t *) arg;
@@ -78,8 +80,6 @@ static size_t kw2xrf_tx_load(uint8_t *pkt_buf, uint8_t *buf, size_t len, size_t 
 static void kw2xrf_tx_exec(kw2xrf_t *dev)
 {
     if (dev->netdev.flags & KW2XRF_OPT_AUTOACK) {
-        /* TODO: replace magic number */
-        kw2xrf_seq_timeout_on(dev, 0x8ffff);
         kw2xrf_set_sequence(dev, XCVSEQ_TX_RX);
     }
     else {
@@ -605,6 +605,7 @@ static void _isr_event_seq_tr(netdev2_t *netdev, uint8_t *dregs)
         DEBUG("[kw2xrf]: finished TXSEQ\n");
         irqsts1 |= MKW2XDM_IRQSTS1_TXIRQ;
         if (dregs[MKW2XDM_PHY_CTRL1] & MKW2XDM_PHY_CTRL1_RXACKRQD) {
+            kw2xrf_seq_timeout_on(dev, _MACACKWAITDURATION);
             DEBUG("[kw2xrf]: wait for RX ACK\n");
         }
     }
