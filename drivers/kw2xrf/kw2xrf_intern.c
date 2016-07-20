@@ -65,19 +65,26 @@ void kw2xrf_set_power_mode(kw2xrf_t *dev, kw2xrf_powermode_t pm)
     uint8_t reg = 0;
     switch (pm) {
         case KW2XRF_HIBERNATE:
+            /* VREG off, XTAL off, Timer off, Current cons. < 1uA */
             reg = 0;
+            dev->state = NETOPT_STATE_SLEEP;
             break;
 
         case KW2XRF_DOZE:
+            /* VREG off, XTAL on, Timer on/off, Current cons. 600uA */
             reg = MKW2XDM_PWR_MODES_XTALEN;
+            dev->state = NETOPT_STATE_SLEEP;
             break;
 
         case KW2XRF_IDLE:
+            /* VREG on, XTAL on, Timer on, Current cons. 700uA */
             reg = MKW2XDM_PWR_MODES_XTALEN | MKW2XDM_PWR_MODES_PMC_MODE;
+            dev->state = NETOPT_STATE_IDLE;
             break;
 
         case KW2XRF_AUTODOZE:
             reg = MKW2XDM_PWR_MODES_XTALEN | MKW2XDM_PWR_MODES_AUTODOZE;
+            dev->state = NETOPT_STATE_IDLE;
             break;
     }
 
