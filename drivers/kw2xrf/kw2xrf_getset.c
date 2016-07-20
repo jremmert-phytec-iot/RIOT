@@ -190,6 +190,27 @@ void kw2xrf_set_idle_sequence(kw2xrf_t *dev)
     reg |= MKW2XDM_PHY_CTRL1_XCVSEQ(dev->idle_state);
     kw2xrf_write_dreg(dev, MKW2XDM_PHY_CTRL1, reg);
 
+    switch (dev->idle_state) {
+        case XCVSEQ_IDLE:
+        /* for inexplicable reasons, the receive mode is also idle mode */
+        case XCVSEQ_RECEIVE:
+            dev->state = NETOPT_STATE_IDLE;
+            break;
+
+        case XCVSEQ_CONTINUOUS_CCA:
+        case XCVSEQ_CCA:
+            dev->state = NETOPT_STATE_RX;
+            break;
+
+        case XCVSEQ_TRANSMIT:
+        case XCVSEQ_TX_RX:
+            dev->state = NETOPT_STATE_TX;
+            break;
+
+        default:
+            dev->state = NETOPT_STATE_IDLE;
+    }
+
     kw2xrf_enable_irq_b(dev);
 }
 
@@ -201,10 +222,11 @@ void kw2xrf_set_sequence(kw2xrf_t *dev, kw2xrf_physeq_t seq)
 
     switch (seq) {
         case XCVSEQ_IDLE:
+        /* for inexplicable reasons, the receive mode is also idle mode */
+        case XCVSEQ_RECEIVE:
             dev->state = NETOPT_STATE_IDLE;
             break;
 
-        case XCVSEQ_RECEIVE:
         case XCVSEQ_CONTINUOUS_CCA:
         case XCVSEQ_CCA:
             dev->state = NETOPT_STATE_RX;
