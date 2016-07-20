@@ -40,6 +40,8 @@
 
 #define _MACACKWAITDURATION         (864 / 16) /* 864us * 62500Hz */
 
+static uint8_t _send_last_fcf;
+
 static void _irq_handler(void *arg)
 {
     netdev2_t *dev = (netdev2_t *) arg;
@@ -79,7 +81,8 @@ static size_t kw2xrf_tx_load(uint8_t *pkt_buf, uint8_t *buf, size_t len, size_t 
 
 static void kw2xrf_tx_exec(kw2xrf_t *dev)
 {
-    if (dev->netdev.flags & KW2XRF_OPT_AUTOACK) {
+    if ((dev->netdev.flags & KW2XRF_OPT_AUTOACK) &&
+        (_send_last_fcf & IEEE802154_FCF_ACK_REQ)) {
         kw2xrf_set_sequence(dev, XCVSEQ_TX_RX);
     }
     else {
@@ -120,6 +123,10 @@ static int _send(netdev2_t *netdev, const struct iovec *vector, int count)
      * MKW2xD Reference Manual, P.192
      */
     dev->buf[0] = len + IEEE802154_FCS_LEN;
+
+    /* Help for decision to use T or TR sequenz */
+    _send_last_fcf = dev->buf[1];
+
     kw2xrf_write_fifo(dev, dev->buf, dev->buf[0]);
 #ifdef MODULE_NETSTATS_L2
     netdev->stats.tx_bytes += len;
