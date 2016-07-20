@@ -187,6 +187,8 @@ static int _set_state(kw2xrf_t *dev, netopt_state_t state)
             kw2xrf_reset_phy(dev);
             break;
 	case NETOPT_STATE_OFF:
+            /* TODO: Replace with powerdown (set reset input low) */
+            kw2xrf_set_power_mode(dev, KW2XRF_HIBERNATE);
         default:
             return -ENOTSUP;
     }
@@ -195,7 +197,7 @@ static int _set_state(kw2xrf_t *dev, netopt_state_t state)
 
 netopt_state_t _get_state(kw2xrf_t *dev)
 {
-    return kw2xrf_get_status(dev);
+    return dev->state;
 }
 
 int _get(netdev2_t *netdev, netopt_t opt, void *value, size_t len)
@@ -511,6 +513,7 @@ static void _isr_event_seq_r(netdev2_t *netdev, uint8_t *dregs)
     if (dregs[MKW2XDM_IRQSTS1] & MKW2XDM_IRQSTS1_RXWTRMRKIRQ) {
         DEBUG("[kw2xrf]: got RXWTRMRKIRQ\n");
         irqsts1 |= MKW2XDM_IRQSTS1_RXWTRMRKIRQ;
+        dev->state = NETOPT_STATE_RX;
         netdev->event_callback(netdev, NETDEV2_EVENT_RX_STARTED);
     }
 
