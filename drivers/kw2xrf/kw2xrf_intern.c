@@ -24,7 +24,7 @@
 #include "kw2xrf_intern.h"
 #include "overwrites.h"
 
-#define ENABLE_DEBUG    (1)
+#define ENABLE_DEBUG    (0)
 #include "debug.h"
 
 void kw2xrf_disable_interrupts(kw2xrf_t *dev)
@@ -175,8 +175,10 @@ void kw2xrf_trigger_tx_ops_disable(kw2xrf_t *dev)
 {
     kw2xrf_clear_dreg_bit(dev, MKW2XDM_PHY_CTRL3, MKW2XDM_PHY_CTRL3_TMR2CMP_EN);
     kw2xrf_write_dreg(dev, MKW2XDM_IRQSTS3, MKW2XDM_IRQSTS3_TMR2IRQ);
-    uint32_t now = kw2xrf_timer_get(dev);
-    DEBUG("[kw2xrf] now: %" PRIx32 "\n", now);
+    if (ENABLE_DEBUG) {
+        uint32_t now = kw2xrf_timer_get(dev);
+        printf("[kw2xrf] now: %" PRIx32 "\n", now);
+    }
 }
 
 void kw2xrf_abort_rx_ops_enable(kw2xrf_t *dev, uint32_t timeout)
@@ -189,8 +191,10 @@ void kw2xrf_abort_rx_ops_disable(kw2xrf_t *dev)
 {
     kw2xrf_clear_dreg_bit(dev, MKW2XDM_PHY_CTRL3, MKW2XDM_PHY_CTRL3_TMR3CMP_EN);
     kw2xrf_write_dreg(dev, MKW2XDM_IRQSTS3, MKW2XDM_IRQSTS3_TMR3IRQ);
-    uint32_t now = kw2xrf_timer_get(dev);
-    DEBUG("[kw2xrf] now: %" PRIx32 "\n", now);
+    if (ENABLE_DEBUG) {
+        uint32_t now = kw2xrf_timer_get(dev);
+        printf("[kw2xrf] now: %" PRIx32 "\n", now);
+    }
 }
 
 void kw2xrf_seq_timeout_on(kw2xrf_t *dev, uint32_t timeout)
@@ -212,8 +216,10 @@ void kw2xrf_seq_timeout_off(kw2xrf_t *dev)
 {
     kw2xrf_clear_dreg_bit(dev, MKW2XDM_PHY_CTRL3, MKW2XDM_PHY_CTRL3_TMR4CMP_EN);
     kw2xrf_write_dreg(dev, MKW2XDM_IRQSTS3, MKW2XDM_IRQSTS3_TMR4IRQ);
-    uint32_t now = kw2xrf_timer_get(dev);
-    DEBUG("[kw2xrf] now: %" PRIx32 "\n", now);
+    if (ENABLE_DEBUG) {
+        uint32_t now = kw2xrf_timer_get(dev);
+        printf("[kw2xrf] now: %" PRIx32 "\n", now);
+    }
 }
 
 uint32_t kw2xrf_get_timestamp(kw2xrf_t *dev)

@@ -34,7 +34,7 @@
 #include "kw2xrf_getset.h"
 #include "kw2xrf_intern.h"
 
-#define ENABLE_DEBUG    (1)
+#define ENABLE_DEBUG    (0)
 #include "debug.h"
 
 #ifdef MODULE_GNRC_SIXLOWPAN
