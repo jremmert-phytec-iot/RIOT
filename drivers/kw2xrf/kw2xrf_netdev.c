@@ -520,12 +520,12 @@ static void _isr_event_seq_r(netdev2_t *netdev, uint8_t *dregs)
     if (dregs[MKW2XDM_IRQSTS1] & MKW2XDM_IRQSTS1_RXWTRMRKIRQ) {
         DEBUG("[kw2xrf]: got RXWTRMRKIRQ\n");
         irqsts1 |= MKW2XDM_IRQSTS1_RXWTRMRKIRQ;
-        dev->state = NETOPT_STATE_RX;
         netdev->event_callback(netdev, NETDEV2_EVENT_RX_STARTED);
     }
 
     if (dregs[MKW2XDM_IRQSTS1] & MKW2XDM_IRQSTS1_RXIRQ) {
         DEBUG("[kw2xrf]: finished RXSEQ\n");
+        dev->state = NETOPT_STATE_RX;
         irqsts1 |= MKW2XDM_IRQSTS1_RXIRQ;
         netdev->event_callback(netdev, NETDEV2_EVENT_RX_COMPLETE);
         if (dregs[MKW2XDM_PHY_CTRL1] & MKW2XDM_PHY_CTRL1_AUTOACK) {
@@ -612,8 +612,8 @@ static void _isr_event_seq_tr(netdev2_t *netdev, uint8_t *dregs)
         DEBUG("[kw2xrf]: finished TXSEQ\n");
         irqsts1 |= MKW2XDM_IRQSTS1_TXIRQ;
         if (dregs[MKW2XDM_PHY_CTRL1] & MKW2XDM_PHY_CTRL1_RXACKRQD) {
-            kw2xrf_seq_timeout_on(dev, _MACACKWAITDURATION);
             DEBUG("[kw2xrf]: wait for RX ACK\n");
+            kw2xrf_seq_timeout_on(dev, _MACACKWAITDURATION);
         }
     }
 
