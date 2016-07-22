@@ -214,6 +214,7 @@ typedef enum {
      */
     NETOPT_ENCRYPTION,        /**< en/disable encryption */
     NETOPT_ENCRYPTION_KEY,    /**< set encryption key */
+	NETOPT_RX_LISTENING,
 
     /* add more options if needed */
 
@@ -252,7 +253,6 @@ typedef enum {
                                  *   transmitting a packet */
     NETOPT_STATE_RESET,         /**< triggers a hardware reset. The resulting
                                  *   state of the network device is @ref NETOPT_STATE_IDLE */
-	NETOPT_STATE_IDLE_NO_RX,
     /* add other states if needed */
 } netopt_state_t;
 
