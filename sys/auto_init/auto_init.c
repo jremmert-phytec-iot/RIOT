@@ -183,6 +183,11 @@ void auto_init(void)
     auto_init_at86rf2xx();
 #endif
 
+#ifdef MODULE_CC2420
+    extern void auto_init_cc2420(void);
+    auto_init_cc2420();
+#endif
+
 #ifdef MODULE_ENCX24J600
     extern void auto_init_encx24j600(void);
     auto_init_encx24j600();
@@ -208,6 +213,11 @@ void auto_init(void)
     auto_init_cc110x();
 #endif
 
+#ifdef MODULE_CC2538_RF
+    extern void auto_init_cc2538_rf(void);
+    auto_init_cc2538_rf();
+#endif
+
 #ifdef MODULE_XBEE
     extern void auto_init_xbee(void);
     auto_init_xbee();
@@ -221,6 +231,11 @@ void auto_init(void)
 #ifdef MODULE_NETDEV2_TAP
     extern void auto_init_netdev2_tap(void);
     auto_init_netdev2_tap();
+#endif
+
+#ifdef MODULE_NORDIC_SOFTDEVICE_BLE
+    extern void gnrc_nordic_ble_6lowpan_init(void);
+    gnrc_nordic_ble_6lowpan_init();
 #endif
 
 #endif /* MODULE_AUTO_INIT_GNRC_NETIF */
