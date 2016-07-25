@@ -131,7 +131,7 @@ void kw2xrf_reset_phy(kw2xrf_t *dev)
     dev->netdev.seq = 0;
     dev->netdev.flags = 0;
     /* set default protocol */
-    dev->netdev.proto = KW2XRF_PROTO;
+    //dev->netdev.proto = KW2XRF_PROTO;
 
     dev->tx_power = KW2XRF_DEFAULT_TX_POWER;
     kw2xrf_set_tx_power(dev, dev->tx_power);

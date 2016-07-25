@@ -1,7 +1,8 @@
 APPLICATION = openthread_example
 
 # If no BOARD is found in the environment, use this default:
-BOARD ?= samr21-xpro
+#BOARD ?= samr21-xpro
+BOARD ?= pba-d-01-kw2x
 
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
@@ -18,8 +19,8 @@ USEMODULE+=openthread
 USEMODULE+=openthread_cli
 
 #USEMODULE += at86rf233
-USEMODULE += at86rf231
-#USEMODULE += kw2xrf
+#USEMODULE += at86rf231
+USEMODULE += kw2xrf
 
 USEMODULE+=random
 USEMODULE+=hashes

@@ -3,7 +3,7 @@
 #include <platform/radio.h>
 #include "ot.h"
 
-#define ENABLE_DEBUG (0)
+#define ENABLE_DEBUG (1)
 #include "debug.h"
 
 #include "errno.h"
@@ -98,7 +98,7 @@ void sleep(void)
 
 bool is_idle(void)
 {
-	return get_state() == NETOPT_STATE_IDLE;
+	return get_state() == NETOPT_STATE_IDLE || NETOPT_STATE_RX;
 }
 
 void idle(void)
